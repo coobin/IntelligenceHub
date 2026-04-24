@@ -192,33 +192,10 @@ h1 {
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
 }
 
-.metrics {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
-  margin: 28px 0;
-}
-
-.metric {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 18px;
-}
-
-.metric span {
-  display: block;
-  font-size: 28px;
-  font-weight: 800;
-}
-
-.metric small {
-  color: var(--muted);
-}
-
 .catalog-area {
   display: grid;
   gap: 22px;
+  margin-top: 28px;
 }
 
 .catalog-section {
@@ -520,8 +497,7 @@ h1 {
     padding: 22px;
   }
 
-  .topbar,
-  .metrics {
+  .topbar {
     grid-template-columns: 1fr;
   }
 

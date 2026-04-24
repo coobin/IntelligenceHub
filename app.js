@@ -5,13 +5,6 @@ const typeLabels = {
   website: "网址"
 };
 
-const metricsMap = {
-  h5: "metricSystems",
-  tool: "metricTools",
-  client: "metricClients",
-  website: "metricWebsites"
-};
-
 const state = {
   catalog: [],
   activeSection: "all",
@@ -31,7 +24,6 @@ async function bootstrap() {
   const data = await response.json();
   state.catalog = data.sections;
   renderNavigation();
-  renderMetrics();
   renderCatalog();
   renderAssistant();
   registerServiceWorker();
@@ -67,17 +59,6 @@ function renderNavigation() {
       renderNavigation();
       renderCatalog();
     });
-  });
-}
-
-function renderMetrics() {
-  const counts = state.catalog.flatMap((section) => section.items).reduce((acc, item) => {
-    acc[item.type] = (acc[item.type] || 0) + 1;
-    return acc;
-  }, {});
-
-  Object.entries(metricsMap).forEach(([type, id]) => {
-    document.querySelector(`#${id}`).textContent = counts[type] || 0;
   });
 }
 
