@@ -6,28 +6,44 @@
       "description": "各类 H5 业务系统和管理后台入口。",
       "items": [
         {
-          "name": "OA 办公门户",
-          "description": "流程审批、通知公告、日常办公协同。",
-          "url": "https://oa.example.com",
+          "name": "金蝶",
+          "description": "财务、供应链和企业经营管理系统。",
+          "url": "https://kingdeesso.chencytech.com",
           "type": "h5",
-          "tags": ["办公", "审批"],
-          "status": "待配置"
+          "tags": ["财务", "ERP"],
+          "status": "内部系统"
         },
         {
-          "name": "人事系统",
-          "description": "组织架构、员工信息、入转调离流程。",
-          "url": "https://hr.example.com",
+          "name": "企业邮箱",
+          "description": "承希企业邮箱登录入口。",
+          "url": "https://mailsso.chencytech.com",
           "type": "h5",
-          "tags": ["HR", "组织"],
-          "status": "待配置"
+          "tags": ["邮箱", "办公"],
+          "status": "内部系统"
         },
         {
-          "name": "财务报销",
-          "description": "费用申请、报销单据、付款进度查询。",
-          "url": "https://finance.example.com",
+          "name": "承希云盘",
+          "description": "企业文件存储、同步和共享。",
+          "url": "https://cloud.chencytech.com",
           "type": "h5",
-          "tags": ["财务", "报销"],
-          "status": "待配置"
+          "tags": ["文件", "协作"],
+          "status": "内部系统"
+        },
+        {
+          "name": "薪人薪事",
+          "description": "人事管理、薪酬和组织信息入口。",
+          "url": "https://xrxs.chencytech.com",
+          "type": "h5",
+          "tags": ["HR", "薪酬"],
+          "status": "内部系统"
+        },
+        {
+          "name": "云之家",
+          "description": "协同办公、消息和组织沟通平台。",
+          "url": "https://www.yunzhijia.com/home/?m=open&a=login",
+          "type": "h5",
+          "tags": ["协同", "办公"],
+          "status": "外部入口"
         }
       ]
     },
@@ -56,32 +72,32 @@
     },
     {
       "id": "tools",
-      "title": "开源工具",
-      "description": "常用开源工具的统一入口，可部署为内部服务。",
+      "title": "工具箱",
+      "description": "常用办公工具和内部部署工具入口。",
       "items": [
         {
-          "name": "Stirling PDF",
-          "description": "PDF 合并、拆分、压缩、转换与签署。",
-          "url": "https://github.com/Stirling-Tools/Stirling-PDF",
+          "name": "PDF 全能转换器",
+          "description": "PDF 合并、拆分、压缩、转换与处理。",
+          "url": "https://pdf.chencytech.com",
           "type": "tool",
-          "tags": ["PDF", "开源"],
-          "status": "可部署"
+          "tags": ["PDF", "转换"],
+          "status": "内部工具"
         },
         {
-          "name": "draw.io",
+          "name": "流程图制作",
           "description": "流程图、架构图、网络拓扑图绘制。",
-          "url": "https://app.diagrams.net/",
+          "url": "https://drawio.chencytech.com",
           "type": "tool",
-          "tags": ["绘图", "开源"],
-          "status": "在线可用"
+          "tags": ["绘图", "流程图"],
+          "status": "内部工具"
         },
         {
-          "name": "Excalidraw",
-          "description": "轻量白板和手绘风格草图协作。",
-          "url": "https://excalidraw.com/",
+          "name": "思维导图",
+          "description": "制作思维导图、结构梳理和方案草稿。",
+          "url": "https://mind.chencytech.com",
           "type": "tool",
-          "tags": ["白板", "协作"],
-          "status": "在线可用"
+          "tags": ["脑图", "梳理"],
+          "status": "内部工具"
         }
       ]
     },
