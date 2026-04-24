@@ -157,13 +157,6 @@ h1 {
   line-height: 1.15;
 }
 
-.lead {
-  max-width: 780px;
-  color: var(--muted);
-  line-height: 1.7;
-  margin-bottom: 0;
-}
-
 .search-panel {
   background: var(--surface);
   border: 1px solid var(--line);
