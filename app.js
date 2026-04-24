@@ -103,22 +103,17 @@ function renderCard(item) {
   const typeClass = `type-${item.type}`;
   const label = typeLabels[item.type] || item.type;
   return `
-    <article class="resource-card">
-      <div class="card-top">
-        <div>
-          <h3>${item.name}</h3>
-          <p>${item.description}</p>
+    <a class="resource-card-link" href="${item.url}" rel="noreferrer">
+      <article class="resource-card">
+        <div class="card-top">
+          <div>
+            <h3>${item.name}</h3>
+            <p>${item.description}</p>
+          </div>
+          <span class="type-pill ${typeClass}">${label}</span>
         </div>
-        <span class="type-pill ${typeClass}">${label}</span>
-      </div>
-      <div class="tags">
-        ${item.tags.map((tag) => `<span class="tag">${tag}</span>`).join("")}
-      </div>
-      <div class="card-actions">
-        <span class="status-text">${item.status}</span>
-        <a class="open-link" href="${item.url}" target="_blank" rel="noreferrer">打开</a>
-      </div>
-    </article>
+      </article>
+    </a>
   `;
 }
 

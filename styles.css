@@ -222,16 +222,29 @@ h1 {
   gap: 14px;
 }
 
+.resource-card-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+
 .resource-card {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 8px;
-  min-height: 188px;
+  min-height: 140px;
   padding: 18px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 8px;
   box-shadow: 0 8px 24px rgba(18, 32, 51, 0.05);
+}
+
+.resource-card-link:hover .resource-card,
+.resource-card-link:focus-visible .resource-card {
+  border-color: rgba(37, 99, 235, 0.45);
+  transform: translateY(-1px);
+  transition: 160ms ease;
 }
 
 .resource-card:hover {
@@ -273,43 +286,9 @@ h1 {
 .type-tool { background: var(--blue); }
 .type-website { background: var(--red); }
 
-.tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: auto;
-}
-
-.tag {
-  background: var(--surface-muted);
-  color: #3b4f6b;
-  border-radius: 999px;
-  padding: 4px 8px;
-  font-size: 12px;
-}
-
-.card-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  border-top: 1px solid var(--line);
-  padding-top: 12px;
-}
-
 .status-text {
   color: var(--muted);
   font-size: 12px;
-}
-
-.open-link {
-  color: var(--accent-strong);
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.open-link:hover {
-  text-decoration: underline;
 }
 
 .assistant-widget {
