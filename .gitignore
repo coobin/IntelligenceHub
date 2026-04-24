@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Local config and secrets
+.env
+.env.*
+!.env.example
+config.local.js
+
+# Build output
+dist/
+build/
+.cache/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp

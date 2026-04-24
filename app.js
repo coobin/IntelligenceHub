@@ -1,0 +1,150 @@
+const typeLabels = {
+  h5: "H5",
+  client: "客户端",
+  tool: "工具",
+  website: "网址"
+};
+
+const metricsMap = {
+  h5: "metricSystems",
+  tool: "metricTools",
+  client: "metricClients",
+  website: "metricWebsites"
+};
+
+const state = {
+  catalog: [],
+  activeSection: "all",
+  query: ""
+};
+
+const sectionNav = document.querySelector("#sectionNav");
+const catalogArea = document.querySelector("#catalogArea");
+const searchInput = document.querySelector("#globalSearch");
+
+async function bootstrap() {
+  const response = await fetch("./data/catalog.json");
+  const data = await response.json();
+  state.catalog = data.sections;
+  renderNavigation();
+  renderMetrics();
+  renderCatalog();
+  renderAssistant();
+}
+
+function renderNavigation() {
+  const total = state.catalog.reduce((sum, section) => sum + section.items.length, 0);
+  const navItems = [
+    { id: "all", title: "全部入口", count: total },
+    ...state.catalog.map((section) => ({ id: section.id, title: section.title, count: section.items.length }))
+  ];
+
+  sectionNav.innerHTML = navItems.map((item) => `
+    <button class="nav-button ${item.id === state.activeSection ? "active" : ""}" data-section="${item.id}">
+      <span>${item.title}</span>
+      <span class="nav-count">${item.count}</span>
+    </button>
+  `).join("");
+
+  sectionNav.querySelectorAll("button").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.activeSection = button.dataset.section;
+      renderNavigation();
+      renderCatalog();
+    });
+  });
+}
+
+function renderMetrics() {
+  const counts = state.catalog.flatMap((section) => section.items).reduce((acc, item) => {
+    acc[item.type] = (acc[item.type] || 0) + 1;
+    return acc;
+  }, {});
+
+  Object.entries(metricsMap).forEach(([type, id]) => {
+    document.querySelector(`#${id}`).textContent = counts[type] || 0;
+  });
+}
+
+function renderCatalog() {
+  const filteredSections = state.catalog
+    .filter((section) => state.activeSection === "all" || section.id === state.activeSection)
+    .map((section) => ({ ...section, items: filterItems(section.items) }))
+    .filter((section) => section.items.length > 0);
+
+  if (filteredSections.length === 0) {
+    catalogArea.innerHTML = `<div class="empty-state">未找到匹配的入口，请调整关键词或分类。</div>`;
+    return;
+  }
+
+  catalogArea.innerHTML = filteredSections.map((section) => `
+    <section class="catalog-section" id="section-${section.id}">
+      <div class="section-heading">
+        <div>
+          <h2>${section.title}</h2>
+          <p>${section.description}</p>
+        </div>
+        <span class="status-text">${section.items.length} 项</span>
+      </div>
+      <div class="item-grid">
+        ${section.items.map(renderCard).join("")}
+      </div>
+    </section>
+  `).join("");
+}
+
+function filterItems(items) {
+  const query = state.query.trim().toLowerCase();
+  if (!query) return items;
+
+  return items.filter((item) => {
+    const haystack = [item.name, item.description, item.type, item.status, ...item.tags].join(" ").toLowerCase();
+    return haystack.includes(query);
+  });
+}
+
+function renderCard(item) {
+  const typeClass = `type-${item.type}`;
+  const label = typeLabels[item.type] || item.type;
+  return `
+    <article class="resource-card">
+      <div class="card-top">
+        <div>
+          <h3>${item.name}</h3>
+          <p>${item.description}</p>
+        </div>
+        <span class="type-pill ${typeClass}">${label}</span>
+      </div>
+      <div class="tags">
+        ${item.tags.map((tag) => `<span class="tag">${tag}</span>`).join("")}
+      </div>
+      <div class="card-actions">
+        <span class="status-text">${item.status}</span>
+        <a class="open-link" href="${item.url}" target="_blank" rel="noreferrer">打开</a>
+      </div>
+    </article>
+  `;
+}
+
+function renderAssistant() {
+  const config = window.IntelligenceHubConfig || {};
+  const title = config.assistantTitle || "承希智汇问答";
+  const subtitle = config.assistantSubtitle || "连接 FastGPT 后可提供实时问答与知识库检索。";
+  document.querySelector("#assistantTitle").textContent = title;
+  document.querySelector("#assistantSubtitle").textContent = subtitle;
+
+  if (config.fastgptChatUrl) {
+    document.querySelector("#assistantFrame").innerHTML = `
+      <iframe title="${title}" src="${config.fastgptChatUrl}" allow="clipboard-read; clipboard-write"></iframe>
+    `;
+  }
+}
+
+searchInput.addEventListener("input", (event) => {
+  state.query = event.target.value;
+  renderCatalog();
+});
+
+bootstrap().catch((error) => {
+  catalogArea.innerHTML = `<div class="empty-state">资源数据加载失败：${error.message}</div>`;
+});

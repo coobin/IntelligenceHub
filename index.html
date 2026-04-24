@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="承希智汇 Chency Intelligence Hub - 企业内部系统、工具、网址与智能问答入口。" />
+    <title>承希智汇 | Chency Intelligence Hub</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="./config.local.js"></script>
+    <script type="module" src="./app.js"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="主导航">
+        <div class="brand-block">
+          <div class="brand-mark" aria-hidden="true">CI</div>
+          <div>
+            <div class="brand-name">承希智汇</div>
+            <div class="brand-subtitle">Chency Intelligence Hub</div>
+          </div>
+        </div>
+        <nav class="section-nav" id="sectionNav"></nav>
+        <div class="sidebar-footer">
+          <span class="status-dot"></span>
+          <span>内部工作台</span>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Enterprise Navigation</p>
+            <h1>承希智汇</h1>
+            <p class="lead">统一访问内部 H5 系统、本地客户端、开源工具、常用网址与实时问答。</p>
+          </div>
+          <div class="search-panel" role="search">
+            <label for="globalSearch">全局搜索</label>
+            <input id="globalSearch" type="search" placeholder="搜索系统、工具、网址或标签" autocomplete="off" />
+          </div>
+        </header>
+
+        <section class="metrics" aria-label="资源概览">
+          <div class="metric"><span id="metricSystems">0</span><small>内部系统</small></div>
+          <div class="metric"><span id="metricTools">0</span><small>工具入口</small></div>
+          <div class="metric"><span id="metricClients">0</span><small>客户端</small></div>
+          <div class="metric"><span id="metricWebsites">0</span><small>常用网址</small></div>
+        </section>
+
+        <div class="content-grid">
+          <section class="catalog-area" id="catalogArea" aria-live="polite"></section>
+
+          <aside class="assistant-panel" aria-label="智能问答">
+            <div class="assistant-header">
+              <span class="assistant-badge">AI</span>
+              <div>
+                <h2 id="assistantTitle">承希智汇问答</h2>
+                <p id="assistantSubtitle">连接 FastGPT 后可提供实时问答与知识库检索。</p>
+              </div>
+            </div>
+            <div class="assistant-frame" id="assistantFrame">
+              <div class="assistant-placeholder">
+                <strong>FastGPT 接入预留</strong>
+                <span>在本地 config.local.js 中配置 fastgptChatUrl 后，这里会嵌入实时问答。</span>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>

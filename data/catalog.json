@@ -1,0 +1,120 @@
+{
+  "sections": [
+    {
+      "id": "systems",
+      "title": "内部系统",
+      "description": "各类 H5 业务系统和管理后台入口。",
+      "items": [
+        {
+          "name": "OA 办公门户",
+          "description": "流程审批、通知公告、日常办公协同。",
+          "url": "https://oa.example.com",
+          "type": "h5",
+          "tags": ["办公", "审批"],
+          "status": "待配置"
+        },
+        {
+          "name": "人事系统",
+          "description": "组织架构、员工信息、入转调离流程。",
+          "url": "https://hr.example.com",
+          "type": "h5",
+          "tags": ["HR", "组织"],
+          "status": "待配置"
+        },
+        {
+          "name": "财务报销",
+          "description": "费用申请、报销单据、付款进度查询。",
+          "url": "https://finance.example.com",
+          "type": "h5",
+          "tags": ["财务", "报销"],
+          "status": "待配置"
+        }
+      ]
+    },
+    {
+      "id": "clients",
+      "title": "本地客户端",
+      "description": "通过系统协议或本地路径打开桌面客户端。",
+      "items": [
+        {
+          "name": "企业微信",
+          "description": "打开企业微信客户端。",
+          "url": "weixinwork://",
+          "type": "client",
+          "tags": ["IM", "客户端"],
+          "status": "需本机安装"
+        },
+        {
+          "name": "远程桌面",
+          "description": "打开远程桌面客户端或指定协议地址。",
+          "url": "rdp://",
+          "type": "client",
+          "tags": ["远程", "运维"],
+          "status": "需协议配置"
+        }
+      ]
+    },
+    {
+      "id": "tools",
+      "title": "开源工具",
+      "description": "常用开源工具的统一入口，可部署为内部服务。",
+      "items": [
+        {
+          "name": "Stirling PDF",
+          "description": "PDF 合并、拆分、压缩、转换与签署。",
+          "url": "https://github.com/Stirling-Tools/Stirling-PDF",
+          "type": "tool",
+          "tags": ["PDF", "开源"],
+          "status": "可部署"
+        },
+        {
+          "name": "draw.io",
+          "description": "流程图、架构图、网络拓扑图绘制。",
+          "url": "https://app.diagrams.net/",
+          "type": "tool",
+          "tags": ["绘图", "开源"],
+          "status": "在线可用"
+        },
+        {
+          "name": "Excalidraw",
+          "description": "轻量白板和手绘风格草图协作。",
+          "url": "https://excalidraw.com/",
+          "type": "tool",
+          "tags": ["白板", "协作"],
+          "status": "在线可用"
+        }
+      ]
+    },
+    {
+      "id": "websites",
+      "title": "常用网址",
+      "description": "工作中高频访问的官网、文档和知识平台。",
+      "items": [
+        {
+          "name": "GitHub",
+          "description": "代码托管、Issue、Pull Request 与 Actions。",
+          "url": "https://github.com/",
+          "type": "website",
+          "tags": ["研发", "代码"],
+          "status": "外部站点"
+        },
+        {
+          "name": "Docker Hub",
+          "description": "容器镜像查询、版本确认和部署参考。",
+          "url": "https://hub.docker.com/",
+          "type": "website",
+          "tags": ["运维", "容器"],
+          "status": "外部站点"
+        },
+        {
+          "name": "MDN Web Docs",
+          "description": "Web 标准、浏览器 API 与前端参考。",
+          "url": "https://developer.mozilla.org/",
+          "type": "website",
+          "tags": ["文档", "前端"],
+          "status": "外部站点"
+        }
+      ]
+    }
+  ]
+}
