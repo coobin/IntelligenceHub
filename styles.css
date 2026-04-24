@@ -53,7 +53,7 @@ input {
 }
 
 .brand-mark {
-  width: 48px;
+  width: 54px;
   height: 48px;
   display: grid;
   place-items: center;
@@ -356,13 +356,14 @@ h1 {
 }
 
 .assistant-fab {
-  width: 58px;
-  height: 58px;
+  min-width: 92px;
+  height: 46px;
+  padding: 0 14px;
   border: 0;
-  border-radius: 50%;
-  background: var(--navy);
+  border-radius: 999px;
+  background: var(--accent);
   color: #ffffff;
-  box-shadow: 0 16px 36px rgba(15, 31, 58, 0.26);
+  box-shadow: 0 16px 36px rgba(37, 99, 235, 0.28);
   cursor: pointer;
   display: grid;
   place-items: center;
@@ -379,13 +380,10 @@ h1 {
 }
 
 .assistant-fab-mark {
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
-  background: var(--accent);
-  display: grid;
-  place-items: center;
+  display: block;
   font-weight: 800;
+  font-size: 14px;
+  white-space: nowrap;
 }
 
 .assistant-panel {
@@ -532,8 +530,8 @@ h1 {
   }
 
   .assistant-fab {
-    width: 54px;
-    height: 54px;
+    min-width: 84px;
+    height: 44px;
   }
 
   .assistant-panel {

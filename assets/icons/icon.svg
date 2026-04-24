@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="承希智汇">
   <rect width="512" height="512" rx="96" fill="#0f1f3a"/>
   <rect x="72" y="72" width="368" height="368" rx="56" fill="#2563eb"/>
-  <path fill="#ffffff" d="M148 170h92v40h-48v92h48v40h-92V170Zm132 0h84v40h-40v92h40v40h-84v-40h40v-92h-40v-40Z"/>
+  <text x="256" y="304" text-anchor="middle" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="132" font-weight="800">CIH</text>
   <path fill="#cfeff2" d="M148 366h216v28H148z"/>
 </svg>
