@@ -32,7 +32,7 @@ async function bootstrap() {
 function loadLocalConfig() {
   return new Promise((resolve) => {
     const script = document.createElement("script");
-    script.src = "./config.local.js";
+    script.src = `./config.local.js?t=${Date.now()}`;
     script.onload = resolve;
     script.onerror = resolve;
     document.head.append(script);
