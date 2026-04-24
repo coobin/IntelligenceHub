@@ -17,6 +17,7 @@ const searchInput = document.querySelector("#globalSearch");
 const assistantToggle = document.querySelector("#assistantToggle");
 const assistantClose = document.querySelector("#assistantClose");
 const assistantPanel = document.querySelector("#assistantPanel");
+const assistantOpenExternal = document.querySelector("#assistantOpenExternal");
 
 async function bootstrap() {
   await loadLocalConfig();
@@ -131,6 +132,8 @@ function renderAssistant() {
   assistantToggle.setAttribute("aria-label", `打开${title}`);
 
   if (config.fastgptChatUrl) {
+    assistantOpenExternal.href = config.fastgptChatUrl;
+    assistantOpenExternal.hidden = false;
     document.querySelector("#assistantFrame").innerHTML = `
       <iframe title="${title}" src="${config.fastgptChatUrl}" allow="clipboard-read; clipboard-write"></iframe>
     `;
