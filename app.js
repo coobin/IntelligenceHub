@@ -21,8 +21,12 @@ const state = {
 const sectionNav = document.querySelector("#sectionNav");
 const catalogArea = document.querySelector("#catalogArea");
 const searchInput = document.querySelector("#globalSearch");
+const assistantToggle = document.querySelector("#assistantToggle");
+const assistantClose = document.querySelector("#assistantClose");
+const assistantPanel = document.querySelector("#assistantPanel");
 
 async function bootstrap() {
+  await loadLocalConfig();
   const response = await fetch("./data/catalog.json");
   const data = await response.json();
   state.catalog = data.sections;
@@ -30,6 +34,17 @@ async function bootstrap() {
   renderMetrics();
   renderCatalog();
   renderAssistant();
+  registerServiceWorker();
+}
+
+function loadLocalConfig() {
+  return new Promise((resolve) => {
+    const script = document.createElement("script");
+    script.src = "./config.local.js";
+    script.onload = resolve;
+    script.onerror = resolve;
+    document.head.append(script);
+  });
 }
 
 function renderNavigation() {
@@ -132,6 +147,7 @@ function renderAssistant() {
   const subtitle = config.assistantSubtitle || "连接 FastGPT 后可提供实时问答与知识库检索。";
   document.querySelector("#assistantTitle").textContent = title;
   document.querySelector("#assistantSubtitle").textContent = subtitle;
+  assistantToggle.setAttribute("aria-label", `打开${title}`);
 
   if (config.fastgptChatUrl) {
     document.querySelector("#assistantFrame").innerHTML = `
@@ -140,9 +156,38 @@ function renderAssistant() {
   }
 }
 
+function setAssistantOpen(isOpen) {
+  assistantPanel.classList.toggle("open", isOpen);
+  assistantPanel.setAttribute("aria-hidden", String(!isOpen));
+  assistantToggle.setAttribute("aria-expanded", String(isOpen));
+  assistantToggle.setAttribute("aria-label", isOpen ? "关闭承希智汇问答" : "打开承希智汇问答");
+}
+
+function registerServiceWorker() {
+  if (!("serviceWorker" in navigator)) return;
+
+  navigator.serviceWorker.register("./sw.js").catch((error) => {
+    console.warn("Service worker registration failed:", error);
+  });
+}
+
 searchInput.addEventListener("input", (event) => {
   state.query = event.target.value;
   renderCatalog();
+});
+
+assistantToggle.addEventListener("click", () => {
+  setAssistantOpen(!assistantPanel.classList.contains("open"));
+});
+
+assistantClose.addEventListener("click", () => {
+  setAssistantOpen(false);
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    setAssistantOpen(false);
+  }
 });
 
 bootstrap().catch((error) => {

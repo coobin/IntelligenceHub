@@ -8,7 +8,8 @@
 - 本地客户端协议入口，例如企业微信、远程桌面等
 - 开源工具入口，例如 Stirling PDF、draw.io、Excalidraw
 - 常用网址导航与全局搜索
-- FastGPT 问答区域预留，支持通过本地配置嵌入公开分享或聊天页面
+- 右侧浮动 FastGPT 问答入口，支持通过本地配置嵌入公开分享或聊天页面
+- PWA 支持，包含 Web App Manifest、Service Worker、离线缓存和应用图标
 
 ## 本地运行
 
@@ -19,6 +20,10 @@ python3 -m http.server 5173
 ```
 
 然后访问 `http://localhost:5173`。
+
+## PWA
+
+项目已包含 `manifest.webmanifest`、`sw.js` 和应用图标。浏览器需要在 `localhost` 或 HTTPS 环境下才能注册 Service Worker 并提供安装入口。
 
 ## 配置入口
 

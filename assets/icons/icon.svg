@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="承希智汇">
+  <rect width="512" height="512" rx="96" fill="#111923"/>
+  <rect x="72" y="72" width="368" height="368" rx="56" fill="#006f78"/>
+  <path fill="#ffffff" d="M148 170h92v40h-48v92h48v40h-92V170Zm132 0h84v40h-40v92h40v40h-84v-40h40v-92h-40v-40Z"/>
+  <path fill="#cfeff2" d="M148 366h216v28H148z"/>
+</svg>
