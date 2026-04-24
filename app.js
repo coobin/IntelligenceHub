@@ -125,7 +125,7 @@ function renderCard(item) {
 function renderAssistant() {
   const config = window.IntelligenceHubConfig || {};
   const title = config.assistantTitle || "承希智汇问答";
-  const subtitle = config.assistantSubtitle || "连接 FastGPT 后可提供实时问答与知识库检索。";
+  const subtitle = config.assistantSubtitle || "承希制度解读助手";
   document.querySelector("#assistantTitle").textContent = title;
   document.querySelector("#assistantSubtitle").textContent = subtitle;
   assistantToggle.setAttribute("aria-label", `打开${title}`);
