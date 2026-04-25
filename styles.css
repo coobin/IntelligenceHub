@@ -329,16 +329,17 @@ h1 {
 
 .assistant-fab {
   min-width: 92px;
-  height: 46px;
-  padding: 0 14px;
+  height: 48px;
+  padding: 0 24px;
   border: 0;
   border-radius: 999px;
   background: var(--accent);
   color: #ffffff;
   box-shadow: 0 16px 36px rgba(37, 99, 235, 0.28);
   cursor: pointer;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .assistant-fab:hover {
