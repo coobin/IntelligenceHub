@@ -67,6 +67,14 @@
           "type": "client",
           "tags": ["远程", "运维"],
           "status": "需协议配置"
+        },
+        {
+          "name": "云之家",
+          "description": "打开云之家移动或桌面客户端。",
+          "url": "kdweibo://",
+          "type": "client",
+          "tags": ["协同", "客户端"],
+          "status": "需本机安装"
         }
       ]
     },
