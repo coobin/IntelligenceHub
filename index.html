@@ -39,10 +39,12 @@
             <p class="eyebrow">Enterprise Navigation</p>
             <h1>承希智汇</h1>
           </div>
-          <div class="search-panel" role="search">
-            <label for="globalSearch">全局搜索</label>
-            <input id="globalSearch" type="search" placeholder="搜索系统、工具、网址或标签" autocomplete="off" />
-          </div>
+          <form class="search-bar" action="https://www.bing.com/search" method="GET" target="_blank">
+            <input name="q" id="globalSearch" type="search" placeholder="在 Bing 中搜索..." autocomplete="off" />
+            <button type="submit" aria-label="搜索">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            </button>
+          </form>
         </header>
 
         <section class="catalog-area" id="catalogArea" aria-live="polite"></section>

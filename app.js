@@ -68,7 +68,7 @@ function renderNavigation() {
 function renderCatalog() {
   const filteredSections = state.catalog
     .filter((section) => state.activeSection === "all" || section.id === state.activeSection)
-    .map((section) => ({ ...section, items: filterItems(section.items) }))
+    .map((section) => ({ ...section, items: section.items }))
     .filter((section) => section.items.length > 0);
 
   if (filteredSections.length === 0) {
@@ -92,15 +92,6 @@ function renderCatalog() {
   `).join("");
 }
 
-function filterItems(items) {
-  const query = state.query.trim().toLowerCase();
-  if (!query) return items;
-
-  return items.filter((item) => {
-    const haystack = [item.name, item.description, item.type, item.status, ...item.tags].join(" ").toLowerCase();
-    return haystack.includes(query);
-  });
-}
 
 function renderCard(item) {
   const typeClass = `type-${item.type}`;
@@ -153,10 +144,6 @@ function registerServiceWorker() {
   });
 }
 
-searchInput.addEventListener("input", (event) => {
-  state.query = event.target.value;
-  renderCatalog();
-});
 
 assistantToggle.addEventListener("click", () => {
   setAssistantOpen(!assistantPanel.classList.contains("open"));

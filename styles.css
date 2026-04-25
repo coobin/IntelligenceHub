@@ -130,10 +130,10 @@ input {
 }
 
 .topbar {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
-  gap: 28px;
-  align-items: end;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  align-items: flex-start;
 }
 
 .eyebrow {
@@ -157,32 +157,50 @@ h1 {
   line-height: 1.15;
 }
 
-.search-panel {
+.search-bar {
+  width: 100%;
+  max-width: 800px;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 14px;
-  box-shadow: var(--shadow);
+  border-radius: 12px;
+  padding: 4px 6px 4px 16px;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 4px 12px rgba(18, 32, 51, 0.04);
+  transition: all 0.2s ease;
 }
 
-.search-panel label {
-  display: block;
-  color: var(--muted);
-  font-size: 12px;
-  margin-bottom: 8px;
-}
-
-.search-panel input {
-  width: 100%;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 11px 12px;
-  outline: none;
-}
-
-.search-panel input:focus {
+.search-bar:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.12);
+  transform: translateY(-1px);
+}
+
+.search-bar input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  padding: 12px 0;
+  font-size: 16px;
+  outline: none;
+  color: var(--text);
+}
+
+.search-bar button {
+  background: var(--accent);
+  color: #ffffff;
+  border: 0;
+  border-radius: 8px;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.search-bar button:hover {
+  background: var(--accent-strong);
 }
 
 .catalog-area {
