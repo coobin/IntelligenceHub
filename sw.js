@@ -1,9 +1,10 @@
-const CACHE_NAME = "intelligence-hub-v18";
+const CACHE_NAME = "intelligence-hub-v19";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
+  "./config.js",
   "./data/catalog.json",
   "./manifest.webmanifest",
   "./assets/icons/icon.svg",

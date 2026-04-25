@@ -19,7 +19,7 @@ const assistantClose = document.querySelector("#assistantClose");
 const assistantPanel = document.querySelector("#assistantPanel");
 
 async function bootstrap() {
-  await loadLocalConfig();
+  await loadConfigs();
   const response = await fetch("./data/catalog.json");
   const data = await response.json();
   state.catalog = data.sections;
@@ -29,14 +29,17 @@ async function bootstrap() {
   registerServiceWorker();
 }
 
-function loadLocalConfig() {
-  return new Promise((resolve) => {
+async function loadConfigs() {
+  const load = (src) => new Promise((resolve) => {
     const script = document.createElement("script");
-    script.src = `./config.local.js?t=${Date.now()}`;
+    script.src = `${src}?t=${Date.now()}`;
     script.onload = resolve;
     script.onerror = resolve;
     document.head.append(script);
   });
+
+  await load("./config.js");
+  await load("./config.local.js");
 }
 
 function renderNavigation() {
