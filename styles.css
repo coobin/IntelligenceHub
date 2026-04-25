@@ -133,7 +133,8 @@ input {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  align-items: flex-start;
+  align-items: stretch;
+  width: 100%;
 }
 
 .eyebrow {
@@ -385,15 +386,22 @@ h1 {
   align-items: flex-start;
 }
 
-.assistant-badge {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  background: var(--navy);
-  color: #ffffff;
-  display: grid;
-  place-items: center;
-  font-weight: 800;
+.assistant-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  background: #f8fafc;
+}
+
+.assistant-avatar-mini {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1.5px solid rgba(255, 255, 255, 0.4);
 }
 
 .assistant-header h2 {
