@@ -232,7 +232,7 @@ h1 {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 8px;
-  min-height: 140px;
+  min-height: 100px;
   padding: 18px;
   display: flex;
   flex-direction: column;

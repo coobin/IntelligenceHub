@@ -78,7 +78,7 @@ function renderCatalog() {
       <div class="section-heading">
         <div>
           <h2>${section.title}</h2>
-          <p>${section.description}</p>
+          ${section.description ? `<p>${section.description}</p>` : ""}
         </div>
         <span class="status-text">${section.items.length} 项</span>
       </div>
@@ -108,7 +108,7 @@ function renderCard(item) {
         <div class="card-top">
           <div>
             <h3>${item.name}</h3>
-            <p>${item.description}</p>
+            ${item.description ? `<p>${item.description}</p>` : ""}
           </div>
           <span class="type-pill ${typeClass}">${label}</span>
         </div>

@@ -3,11 +3,11 @@
     {
       "id": "systems",
       "title": "内部系统",
-      "description": "各类 H5 业务系统和管理后台入口。",
+      "description": "",
       "items": [
         {
           "name": "金蝶",
-          "description": "财务、供应链和企业经营管理系统。",
+          "description": "",
           "url": "https://kingdeesso.chencytech.com",
           "type": "h5",
           "tags": ["财务", "ERP"],

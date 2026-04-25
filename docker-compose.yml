@@ -1,0 +1,8 @@
+version: '3.8'
+services:
+  intelligence-hub:
+    build: .
+    container_name: intelligence-hub
+    ports:
+      - "8080:80"
+    restart: always
