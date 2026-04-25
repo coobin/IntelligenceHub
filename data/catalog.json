@@ -69,36 +69,12 @@
           "status": "需协议配置"
         },
         {
-          "name": "云之家 (kdweibo)",
-          "description": "测试协议：kdweibo://",
-          "url": "kdweibo://",
-          "type": "client",
-          "tags": ["测试"],
-          "status": "测试项 1"
-        },
-        {
-          "name": "云之家 (yunjiajia)",
-          "description": "测试协议：yunjiajia://",
-          "url": "yunjiajia://",
-          "type": "client",
-          "tags": ["测试"],
-          "status": "测试项 2"
-        },
-        {
-          "name": "云之家 (kdapp)",
-          "description": "测试协议：kdapp://",
-          "url": "kdapp://",
-          "type": "client",
-          "tags": ["测试"],
-          "status": "测试项 3"
-        },
-        {
-          "name": "云之家 (cloudhub)",
-          "description": "测试协议：cloudhub://",
+          "name": "云之家",
+          "description": "打开云之家移动或桌面客户端。",
           "url": "cloudhub://",
           "type": "client",
-          "tags": ["测试"],
-          "status": "测试项 4"
+          "tags": ["协同", "客户端"],
+          "status": "需本机安装"
         }
       ]
     },
