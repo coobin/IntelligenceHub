@@ -103,31 +103,23 @@
     },
     {
       "id": "websites",
-      "title": "常用网址",
-      "description": "工作中高频访问的官网、文档和知识平台。",
+      "title": "在线 AI",
+      "description": "常用的人工智能辅助工具与大模型平台。",
       "items": [
         {
-          "name": "GitHub",
-          "description": "代码托管、Issue、Pull Request 与 Actions。",
-          "url": "https://github.com/",
+          "name": "豆包",
+          "description": "字节跳动出品的 AI 智能助手。",
+          "url": "https://www.doubao.com",
           "type": "website",
-          "tags": ["研发", "代码"],
+          "tags": ["AI", "助手"],
           "status": "外部站点"
         },
         {
-          "name": "Docker Hub",
-          "description": "容器镜像查询、版本确认和部署参考。",
-          "url": "https://hub.docker.com/",
+          "name": "DeepSeek",
+          "description": "强大的国产大语言模型平台。",
+          "url": "https://chat.deepseek.com",
           "type": "website",
-          "tags": ["运维", "容器"],
-          "status": "外部站点"
-        },
-        {
-          "name": "MDN Web Docs",
-          "description": "Web 标准、浏览器 API 与前端参考。",
-          "url": "https://developer.mozilla.org/",
-          "type": "website",
-          "tags": ["文档", "前端"],
+          "tags": ["AI", "大模型"],
           "status": "外部站点"
         }
       ]
