@@ -53,20 +53,20 @@
       "description": "通过系统协议或本地路径打开桌面客户端。",
       "items": [
         {
-          "name": "企业微信",
-          "description": "打开企业微信客户端。",
-          "url": "weixinwork://",
+          "name": "微信",
+          "description": "打开个人微信客户端。",
+          "url": "weixin://",
           "type": "client",
           "tags": ["IM", "客户端"],
           "status": "需本机安装"
         },
         {
-          "name": "远程桌面",
-          "description": "打开远程桌面客户端或指定协议地址。",
-          "url": "rdp://",
+          "name": "金蝶",
+          "description": "打开金蝶云客户端。",
+          "url": "kdapp://",
           "type": "client",
-          "tags": ["远程", "运维"],
-          "status": "需协议配置"
+          "tags": ["ERP", "客户端"],
+          "status": "需本机安装"
         },
         {
           "name": "云之家",
