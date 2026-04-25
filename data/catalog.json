@@ -50,7 +50,7 @@
     {
       "id": "clients",
       "title": "本地客户端",
-      "description": "通过系统协议或本地路径打开桌面客户端。",
+      "description": "",
       "items": [
         {
           "name": "微信",
@@ -73,7 +73,7 @@
     {
       "id": "tools",
       "title": "工具箱",
-      "description": "常用办公工具和内部部署工具入口。",
+      "description": "",
       "items": [
         {
           "name": "PDF 全能转换器",
@@ -104,7 +104,7 @@
     {
       "id": "websites",
       "title": "在线 AI",
-      "description": "常用的人工智能辅助工具与大模型平台。",
+      "description": "",
       "items": [
         {
           "name": "豆包",
