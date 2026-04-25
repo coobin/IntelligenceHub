@@ -62,11 +62,11 @@
         },
         {
           "name": "金蝶",
-          "description": "打开金蝶云客户端。",
-          "url": "kdapp://",
+          "description": "打开金蝶云客户端 (需配置本地协议)。",
+          "url": "k3cloud://",
           "type": "client",
           "tags": ["ERP", "客户端"],
-          "status": "需本机安装"
+          "status": "需本地配置"
         },
         {
           "name": "云之家",
