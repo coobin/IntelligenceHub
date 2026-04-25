@@ -105,8 +105,11 @@ function filterItems(items) {
 function renderCard(item) {
   const typeClass = `type-${item.type}`;
   const label = typeLabels[item.type] || item.type;
+  const isExternal = ["h5", "website", "tool"].includes(item.type);
+  const target = isExternal ? 'target="_blank" rel="noopener noreferrer"' : "";
+  
   return `
-    <a class="resource-card-link" href="${item.url}" rel="noreferrer">
+    <a class="resource-card-link" href="${item.url}" ${target}>
       <article class="resource-card">
         <div class="card-top">
           <div>
