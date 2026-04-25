@@ -53,12 +53,20 @@
       "description": "通过系统协议或本地路径打开桌面客户端。",
       "items": [
         {
-          "name": "微信",
-          "description": "打开个人微信客户端。",
+          "name": "微信 (weixin)",
+          "description": "测试协议：weixin://",
           "url": "weixin://",
           "type": "client",
-          "tags": ["IM", "客户端"],
-          "status": "需本机安装"
+          "tags": ["测试"],
+          "status": "测试项 1"
+        },
+        {
+          "name": "微信 (wechat)",
+          "description": "测试协议：wechat://",
+          "url": "wechat://",
+          "type": "client",
+          "tags": ["测试"],
+          "status": "测试项 2"
         },
         {
           "name": "云之家",
