@@ -44,6 +44,14 @@
           "type": "h5",
           "tags": ["HR", "薪酬"],
           "status": "内部系统"
+        },
+        {
+          "name": "魔学院",
+          "description": "企业在线学习平台。",
+          "url": "https://moxueyuan.chencytech.com",
+          "type": "h5",
+          "tags": ["学习", "培训"],
+          "status": "内部系统"
         }
       ]
     },
