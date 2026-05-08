@@ -8,3 +8,6 @@ docker-compose.yml
 deploy.sh
 .gemini
 node_modules
+.git
+.DS_Store
+*.log

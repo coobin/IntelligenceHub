@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>后台管理 | 承希智汇</title>
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      :root {
+        --admin-bg: #f8fafc;
+        --admin-sidebar: #1e293b;
+        --admin-accent: #3b82f6;
+      }
+      
+      body.admin-body {
+        background: var(--admin-bg);
+        margin: 0;
+        font-family: Inter, system-ui, sans-serif;
+      }
+
+      .login-container {
+        display: grid;
+        place-items: center;
+        min-height: 100vh;
+      }
+
+      .login-card {
+        background: white;
+        padding: 40px;
+        border-radius: 16px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+        width: 100%;
+        max-width: 400px;
+      }
+
+      .login-card h1 {
+        margin-bottom: 24px;
+        font-size: 24px;
+        text-align: center;
+      }
+
+      .form-group {
+        margin-bottom: 16px;
+      }
+
+      .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 14px;
+        color: #64748b;
+      }
+
+      .form-group input {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        outline: none;
+      }
+
+      .form-group input:focus {
+        border-color: var(--admin-accent);
+      }
+
+      .login-btn {
+        width: 100%;
+        padding: 12px;
+        background: var(--admin-accent);
+        color: white;
+        border: 0;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .admin-layout {
+        display: grid;
+        grid-template-columns: 260px 1fr;
+        min-height: 100vh;
+      }
+
+      .admin-sidebar {
+        background: var(--admin-sidebar);
+        color: white;
+        padding: 24px;
+      }
+
+      .admin-main {
+        padding: 40px;
+        max-width: 1200px;
+        margin: 0 auto;
+        width: 100%;
+      }
+
+      .section-editor {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        margin-bottom: 32px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+      }
+
+      .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        border-bottom: 1px solid #f1f5f9;
+        padding-bottom: 12px;
+      }
+
+      .item-row {
+        display: grid;
+        grid-template-columns: 2fr 3fr 2fr 1fr auto;
+        gap: 16px;
+        align-items: center;
+        padding: 12px 0;
+        border-bottom: 1px solid #f8fafc;
+      }
+
+      .item-row:last-child {
+        border-bottom: 0;
+      }
+
+      .btn {
+        padding: 8px 16px;
+        border-radius: 6px;
+        font-size: 13px;
+        cursor: pointer;
+        border: 0;
+        font-weight: 500;
+      }
+
+      .btn-primary { background: var(--admin-accent); color: white; }
+      .btn-danger { background: #ef4444; color: white; }
+      .btn-ghost { background: #f1f5f9; color: #475569; }
+
+      .modal {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.5);
+        display: none;
+        place-items: center;
+        z-index: 1000;
+      }
+
+      .modal-content {
+        background: white;
+        padding: 32px;
+        border-radius: 12px;
+        width: 100%;
+        max-width: 600px;
+      }
+
+      .hidden { display: none !important; }
+    </style>
+  </head>
+  <body class="admin-body">
+    <!-- 登录界面 -->
+    <div id="loginView" class="login-container">
+      <div class="login-card">
+        <h1>承希智汇后台</h1>
+        <form id="loginForm">
+          <div class="form-group">
+            <label>用户名</label>
+            <input type="text" id="username" required />
+          </div>
+          <div class="form-group">
+            <label>密码</label>
+            <input type="password" id="password" required />
+          </div>
+          <button type="submit" class="login-btn">登录</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- 管理界面 -->
+    <div id="adminView" class="admin-layout hidden">
+      <aside class="admin-sidebar">
+        <h2>CIH 后台</h2>
+        <nav style="margin-top: 40px;">
+          <div style="margin-bottom: 20px; color: #94a3b8; font-size: 12px; text-transform: uppercase;">数据管理</div>
+          <a href="#" style="color: white; text-decoration: none; display: block; padding: 10px 0;">导航目录编辑</a>
+          <a href="/" style="color: #94a3b8; text-decoration: none; display: block; padding: 10px 0; margin-top: 20px;">返回首页</a>
+          <button id="logoutBtn" class="btn btn-ghost" style="margin-top: 40px; width: 100%;">退出登录</button>
+        </nav>
+      </aside>
+      
+      <main class="admin-main">
+        <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px;">
+          <h1>导航目录编辑</h1>
+          <button class="btn btn-primary" onclick="addSection()">+ 添加分类</button>
+        </header>
+
+        <div id="sectionsList">
+          <!-- 动态加载内容 -->
+        </div>
+      </main>
+    </div>
+
+    <!-- 编辑 Item 模态框 -->
+    <div id="itemModal" class="modal">
+      <div class="modal-content">
+        <h2 id="modalTitle">编辑项目</h2>
+        <form id="itemForm" style="display: grid; gap: 16px; margin-top: 20px;">
+          <input type="hidden" id="editSectionId" />
+          <input type="hidden" id="editItemIndex" />
+          <div class="form-group">
+            <label>名称</label>
+            <input type="text" id="itemName" required />
+          </div>
+          <div class="form-group">
+            <label>描述</label>
+            <input type="text" id="itemDesc" />
+          </div>
+          <div class="form-group">
+            <label>URL</label>
+            <input type="text" id="itemUrl" required />
+          </div>
+          <div class="form-group">
+            <label>类型</label>
+            <select id="itemType" style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px;">
+              <option value="h5">H5</option>
+              <option value="client">客户端</option>
+              <option value="tool">工具</option>
+              <option value="website">网址</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>标签 (逗号分隔)</label>
+            <input type="text" id="itemTags" />
+          </div>
+          <div class="form-group">
+            <label>状态</label>
+            <input type="text" id="itemStatus" />
+          </div>
+          <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 10px;">
+            <button type="button" class="btn btn-ghost" onclick="closeModal()">取消</button>
+            <button type="submit" class="btn btn-primary">保存</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 编辑 Section 模态框 -->
+    <div id="sectionModal" class="modal">
+      <div class="modal-content">
+        <h2 id="sectionModalTitle">编辑分类</h2>
+        <form id="sectionForm" style="display: grid; gap: 16px; margin-top: 20px;">
+          <input type="hidden" id="editSectionIdReal" />
+          <div class="form-group">
+            <label>分类 ID (唯一标识)</label>
+            <input type="text" id="sectionId" required />
+          </div>
+          <div class="form-group">
+            <label>标题</label>
+            <input type="text" id="sectionTitle" required />
+          </div>
+          <div class="form-group">
+            <label>描述</label>
+            <input type="text" id="sectionDesc" />
+          </div>
+          <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 10px;">
+            <button type="button" class="btn btn-ghost" onclick="closeSectionModal()">取消</button>
+            <button type="submit" class="btn btn-primary">保存</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script src="admin.js"></script>
+  </body>
+</html>
