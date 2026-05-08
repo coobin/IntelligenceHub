@@ -8,6 +8,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const port = process.env.PORT || 80;
 
+app.set("trust proxy", 1);
+
 const AUTH_USER = "kay";
 const AUTH_PASS = "kaixuan@123";
 const TOKEN_SECRET = "cih-secret-token-2026"; // 简单起见，直接使用固定字符串作为 Token
@@ -29,7 +31,12 @@ const authenticate = (req, res, next) => {
 app.post("/api/login", (req, res) => {
   const { username, password } = req.body;
   if (username === AUTH_USER && password === AUTH_PASS) {
-    res.cookie("auth_token", TOKEN_SECRET, { httpOnly: true, maxAge: 86400000 });
+    res.cookie("auth_token", TOKEN_SECRET, { 
+      httpOnly: true, 
+      maxAge: 86400000,
+      path: "/",
+      sameSite: "Lax"
+    });
     res.json({ success: true });
   } else {
     res.status(401).json({ success: false, message: "用户名或密码错误" });
