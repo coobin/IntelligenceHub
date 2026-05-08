@@ -40,12 +40,8 @@ function initPhotoViewer() {
   if (!photoDisplay || !viewer || !viewerImg) return;
 
   const openViewer = () => {
-    // 使用原图地址（假设去掉 /preview 或是 /image）
-    // 这里我们尝试将 /preview 替换为 /image 获取原图
-    const previewUrl = photoDisplay.src;
-    const rawUrl = previewUrl.replace("/preview", "/image");
-    
-    viewerImg.src = rawUrl;
+    // 使用预览图地址
+    viewerImg.src = photoDisplay.src;
     viewer.setAttribute("aria-hidden", "false");
     document.body.style.overflow = "hidden"; // 禁止滚动
   };
