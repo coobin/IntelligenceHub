@@ -19,7 +19,7 @@ app.use(cookieParser());
 
 // 鉴权中间件
 const authenticate = (req, res, next) => {
-  const token = req.cookies.auth_token;
+  const token = req.cookies.auth_token || req.headers.authorization?.split(" ")[1];
   if (token === TOKEN_SECRET) {
     next();
   } else {
@@ -37,7 +37,7 @@ app.post("/api/login", (req, res) => {
       path: "/",
       sameSite: "Lax"
     });
-    res.json({ success: true });
+    res.json({ success: true, token: TOKEN_SECRET });
   } else {
     res.status(401).json({ success: false, message: "用户名或密码错误" });
   }
@@ -74,7 +74,7 @@ app.post("/api/logout", (req, res) => {
 
 // 检查登录状态
 app.get("/api/check-auth", (req, res) => {
-  const token = req.cookies.auth_token;
+  const token = req.cookies.auth_token || req.headers.authorization?.split(" ")[1];
   res.json({ authenticated: token === TOKEN_SECRET });
 });
 

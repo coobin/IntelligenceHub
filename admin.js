@@ -2,7 +2,10 @@ let catalog = { sections: [] };
 
 // 页面加载逻辑
 document.addEventListener("DOMContentLoaded", async () => {
-  const authRes = await fetch("/api/check-auth");
+  const token = localStorage.getItem("cih_token");
+  const authRes = await fetch("/api/check-auth", {
+    headers: { "Authorization": `Bearer ${token}` }
+  });
   const { authenticated } = await authRes.json();
   
   if (authenticated) {
@@ -37,6 +40,7 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
   
   const data = await res.json();
   if (data.success) {
+    localStorage.setItem("cih_token", data.token);
     showAdmin();
   } else {
     alert(data.message);
@@ -46,21 +50,29 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
 // 退出登录
 document.getElementById("logoutBtn").addEventListener("click", async () => {
   await fetch("/api/logout", { method: "POST" });
+  localStorage.removeItem("cih_token");
   showLogin();
 });
 
 // 加载数据
 async function loadCatalog() {
-  const res = await fetch("/api/catalog");
+  const token = localStorage.getItem("cih_token");
+  const res = await fetch("/api/catalog", {
+    headers: { "Authorization": `Bearer ${token}` }
+  });
   catalog = await res.json();
   renderAdmin();
 }
 
 // 保存数据
 async function saveCatalog() {
+  const token = localStorage.getItem("cih_token");
   const res = await fetch("/api/catalog", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { 
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`
+    },
     body: JSON.stringify(catalog)
   });
   if (res.ok) {
