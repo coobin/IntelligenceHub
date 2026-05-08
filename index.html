@@ -28,7 +28,7 @@
         </div>
         <nav class="section-nav" id="sectionNav"></nav>
         <div class="daily-photo-display">
-          <img src="https://picker.chencytech.com/api/photos/today/portrait/preview" alt="今日照片" loading="lazy" />
+          <img src="https://picker.chencytech.com/api/photos/today/preview" alt="今日照片" loading="lazy" />
         </div>
         <div class="sidebar-footer">
           <span class="status-dot"></span>
@@ -74,6 +74,13 @@
           </div>
         </div>
       </aside>
+    </section>
+    <section class="photo-viewer" id="photoViewer" aria-hidden="true">
+      <div class="photo-viewer-overlay" id="photoViewerOverlay"></div>
+      <div class="photo-viewer-content">
+        <img src="" alt="今日照片全屏" id="photoViewerImg" />
+        <button class="photo-viewer-close" id="photoViewerClose" type="button" aria-label="关闭预览">×</button>
+      </div>
     </section>
   </body>
 </html>

@@ -26,7 +26,50 @@ async function bootstrap() {
   renderNavigation();
   renderCatalog();
   renderAssistant();
+  initPhotoViewer();
   registerServiceWorker();
+}
+
+function initPhotoViewer() {
+  const photoDisplay = document.querySelector(".daily-photo-display img");
+  const viewer = document.querySelector("#photoViewer");
+  const viewerImg = document.querySelector("#photoViewerImg");
+  const viewerClose = document.querySelector("#photoViewerClose");
+  const viewerOverlay = document.querySelector("#photoViewerOverlay");
+
+  if (!photoDisplay || !viewer || !viewerImg) return;
+
+  const openViewer = () => {
+    // 使用原图地址（假设去掉 /preview 或是 /image）
+    // 这里我们尝试将 /preview 替换为 /image 获取原图
+    const previewUrl = photoDisplay.src;
+    const rawUrl = previewUrl.replace("/preview", "/image");
+    
+    viewerImg.src = rawUrl;
+    viewer.setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden"; // 禁止滚动
+  };
+
+  const closeViewer = () => {
+    viewer.setAttribute("aria-hidden", "true");
+    document.body.style.overflow = "";
+    // 延迟清空 src 避免下次打开闪烁旧图
+    setTimeout(() => {
+      if (viewer.getAttribute("aria-hidden") === "true") {
+        viewerImg.src = "";
+      }
+    }, 300);
+  };
+
+  photoDisplay.addEventListener("click", openViewer);
+  viewerClose.addEventListener("click", closeViewer);
+  viewerOverlay.addEventListener("click", closeViewer);
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && viewer.getAttribute("aria-hidden") === "false") {
+      closeViewer();
+    }
+  });
 }
 
 async function loadConfigs() {
