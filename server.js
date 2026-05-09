@@ -81,6 +81,11 @@ app.get("/api/check-auth", (req, res) => {
 // 静态文件服务
 app.use(express.static(__dirname));
 
+// 后台管理页面路由
+app.get("/admin", (req, res) => {
+  res.sendFile(path.join(__dirname, "admin.html"));
+});
+
 // 所有其他路由返回 index.html（支持单页应用模式，虽然目前主要是多页）
 app.get("*", (req, res, next) => {
   if (req.path.startsWith("/api")) {
