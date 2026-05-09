@@ -86,9 +86,10 @@ app.get("/admin", (req, res) => {
   res.sendFile(path.join(__dirname, "admin.html"));
 });
 
-// 所有其他路由返回 index.html（支持单页应用模式，虽然目前主要是多页）
+// 所有其他路由返回 index.html（支持单页应用模式）
+// 仅对不带扩展名的路径（或 explicitly .html）返回 index.html
 app.get("*", (req, res, next) => {
-  if (req.path.startsWith("/api")) {
+  if (req.path.startsWith("/api") || req.path.includes(".")) {
     return next();
   }
   res.sendFile(path.join(__dirname, "index.html"));
