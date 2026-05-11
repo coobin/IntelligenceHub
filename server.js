@@ -4,6 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import cookieParser from "cookie-parser";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const STATS_FILE = path.join(__dirname, "data/stats.json");
 
 // 初始化统计文件
@@ -12,13 +13,13 @@ const initStats = () => {
     fs.writeFileSync(STATS_FILE, JSON.stringify({
       pageViews: 0,
       clicks: {},
-      daily: {}
+      daily: {},
+      recent: [] // 增加最近访问记录
     }, null, 2));
   }
 };
 initStats();
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const port = process.env.PORT || 80;
 
@@ -102,6 +103,15 @@ app.post("/api/track", (req, res) => {
     if (type === "pageview") {
       stats.pageViews = (stats.pageViews || 0) + 1;
       stats.daily[today] = (stats.daily[today] || 0) + 1;
+      
+      // 记录最近访问
+      const visitor = {
+        time: new Date().toLocaleString("zh-CN", { hour12: false }),
+        user: req.headers["remote-user"] || "匿名用户", // 读取 Authelia 传来的用户名
+        ip: req.ip.replace('::ffff:', ''),
+        ua: req.headers["user-agent"]
+      };
+      stats.recent = [visitor, ...(stats.recent || [])].slice(0, 10);
     } else if (type === "click" && target) {
       stats.clicks[target] = (stats.clicks[target] || 0) + 1;
     }

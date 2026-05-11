@@ -71,6 +71,7 @@ document.getElementById("tabEditor").addEventListener("click", (e) => {
   document.getElementById("editorView").classList.remove("hidden");
   document.getElementById("tabDashboard").classList.remove("active");
   document.getElementById("tabEditor").classList.add("active");
+  renderAdmin(); // 确保渲染
 });
 
 // 加载数据
@@ -164,6 +165,40 @@ function renderStats(stats) {
       </div>
     `;
   }).join("");
+
+  // 渲染最近访客
+  const recentList = document.getElementById("recentList");
+  recentList.innerHTML = `
+    <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+      <thead>
+        <tr style="text-align: left; color: #64748b; border-bottom: 1px solid #f1f5f9;">
+          <th style="padding: 12px 8px;">时间</th>
+          <th style="padding: 12px 8px;">用户名</th>
+          <th style="padding: 12px 8px;">IP 地址</th>
+          <th style="padding: 12px 8px;">设备信息</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${(stats.recent || []).map(r => `
+          <tr style="border-bottom: 1px solid #f8fafc;">
+            <td style="padding: 12px 8px; color: #1e293b;">${r.time}</td>
+            <td style="padding: 12px 8px;"><span style="font-weight: 600; color: var(--admin-accent);">${r.user || "未知"}</span></td>
+            <td style="padding: 12px 8px;"><code style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px;">${r.ip}</code></td>
+            <td style="padding: 12px 8px; color: #64748b; font-size: 12px;">${parseUA(r.ua)}</td>
+          </tr>
+        `).join("") || '<tr><td colspan="4" style="text-align:center; padding:20px; color:#94a3b8;">暂无记录</td></tr>'}
+      </tbody>
+    </table>
+  `;
+}
+
+function parseUA(ua) {
+  if (!ua) return "未知";
+  if (ua.includes("MicroMessenger")) return "微信内置浏览器";
+  if (ua.includes("Mobile")) return "移动设备";
+  if (ua.includes("Windows")) return "Windows PC";
+  if (ua.includes("Macintosh")) return "Mac PC";
+  return "其他设备";
 }
 
 // 渲染管理界面
