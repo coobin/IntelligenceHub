@@ -4,6 +4,20 @@ import path from "path";
 import { fileURLToPath } from "url";
 import cookieParser from "cookie-parser";
 
+const STATS_FILE = path.join(__dirname, "data/stats.json");
+
+// 初始化统计文件
+const initStats = () => {
+  if (!fs.existsSync(STATS_FILE) || fs.readFileSync(STATS_FILE, "utf8").trim() === "") {
+    fs.writeFileSync(STATS_FILE, JSON.stringify({
+      pageViews: 0,
+      clicks: {},
+      daily: {}
+    }, null, 2));
+  }
+};
+initStats();
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const port = process.env.PORT || 80;
@@ -76,6 +90,37 @@ app.post("/api/logout", (req, res) => {
 app.get("/api/check-auth", (req, res) => {
   const token = req.cookies.auth_token || req.headers.authorization?.split(" ")[1];
   res.json({ authenticated: token === TOKEN_SECRET });
+});
+
+// 统计接口 (公开)
+app.post("/api/track", (req, res) => {
+  const { type, target } = req.body;
+  try {
+    const stats = JSON.parse(fs.readFileSync(STATS_FILE, "utf8"));
+    const today = new Date().toISOString().split("T")[0];
+
+    if (type === "pageview") {
+      stats.pageViews = (stats.pageViews || 0) + 1;
+      stats.daily[today] = (stats.daily[today] || 0) + 1;
+    } else if (type === "click" && target) {
+      stats.clicks[target] = (stats.clicks[target] || 0) + 1;
+    }
+
+    fs.writeFileSync(STATS_FILE, JSON.stringify(stats, null, 2));
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false });
+  }
+});
+
+// 获取统计数据 (需鉴权)
+app.get("/api/stats", authenticate, (req, res) => {
+  try {
+    const stats = JSON.parse(fs.readFileSync(STATS_FILE, "utf8"));
+    res.json(stats);
+  } catch (err) {
+    res.status(500).json({ success: false });
+  }
 });
 
 // 静态文件服务

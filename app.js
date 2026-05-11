@@ -28,6 +28,19 @@ async function bootstrap() {
   renderAssistant();
   initPhotoViewer();
   registerServiceWorker();
+  trackEvent("pageview");
+}
+
+async function trackEvent(type, target) {
+  try {
+    await fetch("/api/track", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type, target })
+    });
+  } catch (err) {
+    console.error("Tracking failed:", err);
+  }
 }
 
 function initPhotoViewer() {
@@ -139,7 +152,7 @@ function renderCard(item) {
   const target = isExternal ? 'target="_blank" rel="noopener noreferrer"' : "";
   
   return `
-    <a class="resource-card-link" href="${item.url}" ${target}>
+    <a class="resource-card-link" href="${item.url}" ${target} onclick="trackEvent('click', '${item.name}')">
       <article class="resource-card">
         <div class="card-top">
           <div>

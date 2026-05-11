@@ -24,6 +24,7 @@ async function showAdmin() {
   document.getElementById("loginView").classList.add("hidden");
   document.getElementById("adminView").classList.remove("hidden");
   await loadCatalog();
+  await loadStats();
 }
 
 // 登录处理
@@ -54,6 +55,24 @@ document.getElementById("logoutBtn").addEventListener("click", async () => {
   showLogin();
 });
 
+// Tab 切换逻辑
+document.getElementById("tabDashboard").addEventListener("click", (e) => {
+  e.preventDefault();
+  document.getElementById("dashboardView").classList.remove("hidden");
+  document.getElementById("editorView").classList.add("hidden");
+  document.getElementById("tabDashboard").classList.add("active");
+  document.getElementById("tabEditor").classList.remove("active");
+  loadStats();
+});
+
+document.getElementById("tabEditor").addEventListener("click", (e) => {
+  e.preventDefault();
+  document.getElementById("dashboardView").classList.add("hidden");
+  document.getElementById("editorView").classList.remove("hidden");
+  document.getElementById("tabDashboard").classList.remove("active");
+  document.getElementById("tabEditor").classList.add("active");
+});
+
 // 加载数据
 async function loadCatalog() {
   const token = localStorage.getItem("cih_token");
@@ -81,6 +100,70 @@ async function saveCatalog() {
   } else {
     alert("保存失败");
   }
+}
+
+// 加载统计数据
+async function loadStats() {
+  const token = localStorage.getItem("cih_token");
+  const res = await fetch("/api/stats", {
+    headers: { "Authorization": `Bearer ${token}` }
+  });
+  const stats = await res.json();
+  renderStats(stats);
+}
+
+function renderStats(stats) {
+  const today = new Date().toISOString().split("T")[0];
+  document.getElementById("totalPV").innerText = stats.pageViews || 0;
+  document.getElementById("todayPV").innerText = stats.daily[today] || 0;
+  
+  const totalItems = catalog.sections.reduce((sum, s) => sum + s.items.length, 0);
+  document.getElementById("activeEntries").innerText = totalItems;
+
+  // 渲染排名
+  const rankList = document.getElementById("rankList");
+  const sortedClicks = Object.entries(stats.clicks || {})
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
+  
+  const maxClicks = sortedClicks[0]?.[1] || 1;
+  
+  rankList.innerHTML = sortedClicks.map(([name, count]) => `
+    <div class="rank-item">
+      <span style="width: 100px; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${name}</span>
+      <div class="bar-outer">
+        <div class="bar-inner" style="width: ${(count / maxClicks) * 100}%"></div>
+      </div>
+      <span style="font-weight: 600; color: #1e293b;">${count}</span>
+    </div>
+  `).join("") || '<p style="color:#94a3b8; text-align:center; padding:20px;">暂无点击数据</p>';
+
+  // 渲染趋势 (最近 7 天)
+  const trendList = document.getElementById("trendList");
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    days.push(d.toISOString().split("T")[0]);
+  }
+
+  const maxDaily = Math.max(...days.map(d => stats.daily[d] || 0), 1);
+
+  trendList.innerHTML = days.map(d => {
+    const val = stats.daily[d] || 0;
+    const height = (val / maxDaily) * 100;
+    const label = d.split("-").slice(1).join("/");
+    return `
+      <div style="flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%;">
+        <div style="flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center;">
+          <div style="width: 100%; max-width: 30px; height: ${height}%; background: var(--admin-accent); border-radius: 4px; position: relative;" title="${d}: ${val}">
+            ${val > 0 ? `<span style="position: absolute; top: -20px; left: 50%; transform: translateX(-50%); font-size: 10px; color: #64748b;">${val}</span>` : ""}
+          </div>
+        </div>
+        <span style="font-size: 10px; color: #94a3b8; margin-top: 8px;">${label}</span>
+      </div>
+    `;
+  }).join("");
 }
 
 // 渲染管理界面

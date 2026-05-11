@@ -152,6 +152,90 @@
         max-width: 600px;
       }
 
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 24px;
+        margin-bottom: 40px;
+      }
+
+      .stats-card {
+        background: white;
+        padding: 24px;
+        border-radius: 16px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+        border: 1px solid #f1f5f9;
+      }
+
+      .stats-card h3 {
+        margin: 0 0 8px 0;
+        font-size: 14px;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .stats-card .value {
+        font-size: 32px;
+        font-weight: 700;
+        color: #1e293b;
+      }
+
+      .chart-container {
+        background: white;
+        padding: 24px;
+        border-radius: 16px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+        margin-bottom: 32px;
+      }
+
+      .rank-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 0;
+        border-bottom: 1px solid #f8fafc;
+      }
+
+      .rank-item:last-child { border-bottom: 0; }
+
+      .bar-outer {
+        flex: 1;
+        height: 8px;
+        background: #f1f5f9;
+        border-radius: 4px;
+        margin: 0 16px;
+        overflow: hidden;
+      }
+
+      .bar-inner {
+        height: 100%;
+        background: var(--admin-accent);
+        border-radius: 4px;
+      }
+
+      .nav-link {
+        color: #94a3b8;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        border-radius: 8px;
+        margin-bottom: 4px;
+        transition: all 0.2s;
+      }
+
+      .nav-link:hover {
+        background: rgba(255,255,255,0.05);
+        color: white;
+      }
+
+      .nav-link.active {
+        background: var(--admin-accent);
+        color: white;
+      }
+
       .hidden { display: none !important; }
     </style>
   </head>
@@ -179,21 +263,70 @@
       <aside class="admin-sidebar">
         <h2>CIH 后台</h2>
         <nav style="margin-top: 40px;">
-          <div style="margin-bottom: 20px; color: #94a3b8; font-size: 12px; text-transform: uppercase;">数据管理</div>
-          <a href="#" style="color: white; text-decoration: none; display: block; padding: 10px 0;">导航目录编辑</a>
-          <a href="/" style="color: #94a3b8; text-decoration: none; display: block; padding: 10px 0; margin-top: 20px;">返回首页</a>
-          <button id="logoutBtn" class="btn btn-ghost" style="margin-top: 40px; width: 100%;">退出登录</button>
+          <div style="margin-bottom: 20px; color: #94a3b8; font-size: 11px; text-transform: uppercase; padding: 0 16px;">管理菜单</div>
+          <a href="#" class="nav-link active" id="tabDashboard">
+            <span>数据仪表盘</span>
+          </a>
+          <a href="#" class="nav-link" id="tabEditor">
+            <span>导航目录编辑</span>
+          </a>
+          <div style="margin-top: 40px; margin-bottom: 20px; color: #94a3b8; font-size: 11px; text-transform: uppercase; padding: 0 16px;">系统控制</div>
+          <a href="/" class="nav-link">
+            <span>返回首页</span>
+          </a>
+          <button id="logoutBtn" class="btn btn-danger" style="margin-top: 20px; width: 100%; padding: 12px;">退出登录</button>
         </nav>
       </aside>
       
       <main class="admin-main">
-        <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px;">
-          <h1>导航目录编辑</h1>
-          <button class="btn btn-primary" onclick="addSection()">+ 添加分类</button>
-        </header>
+        <!-- Dashboard View -->
+        <div id="dashboardView">
+          <header style="margin-bottom: 40px;">
+            <h1 style="font-size: 28px; margin-bottom: 8px;">数据概览</h1>
+            <p style="color: #64748b;">实时监测 Intelligence Hub 的使用情况</p>
+          </header>
 
-        <div id="sectionsList">
-          <!-- 动态加载内容 -->
+          <div class="stats-grid">
+            <div class="stats-card">
+              <h3>总访问次数 (PV)</h3>
+              <div class="value" id="totalPV">0</div>
+            </div>
+            <div class="stats-card">
+              <h3>今日访问</h3>
+              <div class="value" id="todayPV">0</div>
+            </div>
+            <div class="stats-card">
+              <h3>活跃入口数</h3>
+              <div class="value" id="activeEntries">0</div>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 32px;">
+            <div class="chart-container">
+              <h3 style="margin-bottom: 24px; font-size: 16px; color: #1e293b;">热门入口排行</h3>
+              <div id="rankList">
+                <!-- 动态加载 -->
+              </div>
+            </div>
+            <div class="chart-container">
+              <h3 style="margin-bottom: 24px; font-size: 16px; color: #1e293b;">最近 7 日趋势</h3>
+              <div id="trendList" style="display: flex; align-items: flex-end; height: 200px; gap: 12px; padding-top: 20px;">
+                <!-- 动态加载柱状图 -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Editor View -->
+        <div id="editorView" class="hidden">
+          <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px;">
+            <h1>导航目录编辑</h1>
+            <button class="btn btn-primary" onclick="addSection()">+ 添加分类</button>
+          </header>
+
+          <div id="sectionsList">
+            <!-- 动态加载内容 -->
+          </div>
         </div>
       </main>
     </div>
