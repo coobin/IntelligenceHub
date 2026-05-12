@@ -70,14 +70,14 @@ async function bootstrap() {
 
 async function trackEvent(type, target) {
   try {
-    await fetch("/api/track", {
+    // 使用 keepalive: true 确保页面跳转时请求不会被取消
+    fetch("/api/track", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type, target })
+      body: JSON.stringify({ type, target }),
+      keepalive: true
     });
-  } catch (err) {
-    console.error("Tracking failed:", err);
-  }
+  } catch (err) {}
 }
 
 function initPhotoViewer() {

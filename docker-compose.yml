@@ -9,4 +9,11 @@ services:
       - TZ=Asia/Shanghai
     volumes:
       - ./data:/app/data
+      - ./app.js:/app/app.js
+      - ./styles.css:/app/styles.css
+      - ./index.html:/app/index.html
+      - ./admin.html:/app/admin.html
+      - ./admin.js:/app/admin.js
+      - ./server.js:/app/server.js
+      - ./sw.js:/app/sw.js
     restart: always
