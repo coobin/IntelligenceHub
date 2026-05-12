@@ -112,8 +112,12 @@ app.post("/api/logout", (req, res) => {
 
 // 检查登录状态
 app.get("/api/check-auth", (req, res) => {
+  const remoteUser = req.headers["remote-user"];
   const token = req.cookies.auth_token || req.headers.authorization?.split(" ")[1];
-  res.json({ authenticated: token === TOKEN_SECRET });
+  
+  // 如果是 SSO 指定用户，或者有正确 Token，都视为已登录
+  const authenticated = (remoteUser === "hekaixuan") || (token === TOKEN_SECRET);
+  res.json({ authenticated });
 });
 
 // 统计接口 (公开)

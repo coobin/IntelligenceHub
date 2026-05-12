@@ -10,6 +10,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   
   if (authenticated) {
     showAdmin();
+    loadCatalog();
+    loadStats();
   } else {
     showLogin();
   }
