@@ -106,7 +106,7 @@ app.post("/api/track", (req, res) => {
       
       // 记录最近访问
       const visitor = {
-        time: new Date().toLocaleString("zh-CN", { hour12: false }),
+        time: new Date().toLocaleString("zh-CN", { hour12: false, timeZone: "Asia/Shanghai" }),
         user: req.headers["remote-user"] || "匿名用户", // 读取 Authelia 传来的用户名
         ip: req.ip.replace('::ffff:', ''),
         ua: req.headers["user-agent"]
