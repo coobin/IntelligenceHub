@@ -3,8 +3,24 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import cookieParser from "cookie-parser";
+import multer from "multer";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ICONS_DIR = path.join(__dirname, "data/icons");
+
+// 确保目录存在
+if (!fs.existsSync(ICONS_DIR)) fs.mkdirSync(ICONS_DIR, { recursive: true });
+
+// 配置上传
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, ICONS_DIR),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `icon-${Date.now()}${ext}`);
+  }
+});
+const upload = multer({ storage });
+
 const STATS_FILE = path.join(__dirname, "data/stats.json");
 
 // 初始化统计文件
@@ -133,7 +149,14 @@ app.get("/api/stats", authenticate, (req, res) => {
   }
 });
 
+// 图标上传接口
+app.post("/api/upload-icon", authenticate, upload.single("icon"), (req, res) => {
+  if (!req.file) return res.status(400).json({ success: false, message: "No file uploaded" });
+  res.json({ success: true, filepath: `data/icons/${req.file.filename}` });
+});
+
 // 静态文件服务
+app.use("/data/icons", express.static(ICONS_DIR));
 app.use(express.static(__dirname));
 
 // 后台管理页面路由

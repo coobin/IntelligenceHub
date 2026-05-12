@@ -194,11 +194,17 @@ function renderCard(item) {
   const target = isExternal ? 'target="_blank" rel="noopener noreferrer"' : "";
   const iconName = getIcon(item.name, item.icon);
   
+  // 判断是 Lucide 图标还是图片路径
+  const isImageIcon = iconName && (iconName.includes("/") || iconName.includes("."));
+  const iconHtml = isImageIcon 
+    ? `<img src="${iconName}" alt="" style="width: 24px; height: 24px; object-fit: contain;">`
+    : `<i data-lucide="${iconName}"></i>`;
+
   return `
     <a class="resource-card-link" href="${item.url}" ${target} onclick="trackEvent('click', '${item.name}')">
       <article class="resource-card">
         <div class="card-icon">
-          <i data-lucide="${iconName}"></i>
+          ${iconHtml}
         </div>
         <div class="card-content">
           <div class="card-top">

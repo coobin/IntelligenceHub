@@ -309,6 +309,41 @@ function closeModal() {
   document.getElementById("itemModal").style.display = "none";
 }
 
+async function uploadIcon(input) {
+  if (!input.files || !input.files[0]) return;
+  
+  const token = localStorage.getItem("cih_token");
+  const formData = new FormData();
+  formData.append("icon", input.files[0]);
+  
+  const btn = input.previousElementSibling;
+  const originalText = btn.innerText;
+  btn.innerText = "上传中...";
+  btn.disabled = true;
+
+  try {
+    const res = await fetch("/api/upload-icon", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${token}` },
+      body: formData
+    });
+    const data = await res.json();
+    if (data.success) {
+      document.getElementById("itemIcon").value = data.filepath;
+      btn.innerText = "上传成功";
+      setTimeout(() => btn.innerText = "更换图片", 2000);
+    } else {
+      alert("上传失败: " + (data.message || "未知错误"));
+      btn.innerText = "上传失败";
+    }
+  } catch (err) {
+    alert("上传错误");
+    btn.innerText = "上传错误";
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 // --- Section 操作 ---
 function addSection() {
   document.getElementById("sectionModalTitle").innerText = "添加分类";
