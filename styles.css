@@ -265,26 +265,51 @@ h1 {
 .resource-card {
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 12px;
   min-height: 100px;
-  padding: 18px;
+  padding: 20px;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex-direction: row; /* 横向布局 */
+  gap: 16px;
   box-shadow: 0 8px 24px rgba(18, 32, 51, 0.05);
+  transition: all 0.3s ease;
 }
 
 .resource-card-link:hover .resource-card,
 .resource-card-link:focus-visible .resource-card {
-  border-color: rgba(37, 99, 235, 0.45);
-  transform: translateY(-1px);
-  transition: 160ms ease;
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(37, 99, 235, 0.12);
 }
 
-.resource-card:hover {
-  border-color: rgba(37, 99, 235, 0.45);
-  transform: translateY(-1px);
-  transition: 160ms ease;
+.card-icon {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  border-radius: 12px;
+  background: rgba(37, 99, 235, 0.08);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.resource-card-link:hover .card-icon {
+  background: var(--accent);
+  color: #ffffff;
+  transform: scale(1.05);
+}
+
+.card-icon svg {
+  width: 24px;
+  height: 24px;
+  stroke-width: 2;
+}
+
+.card-content {
+  flex: 1;
+  min-width: 0;
 }
 
 .card-top {

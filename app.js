@@ -5,6 +5,43 @@ const typeLabels = {
   website: "网址"
 };
 
+const iconMapping = {
+  "邮件": "mail",
+  "邮箱": "mail",
+  "办公": "briefcase",
+  "钉钉": "message-square",
+  "微信": "message-circle",
+  "代码": "code",
+  "开发": "terminal",
+  "文档": "file-text",
+  "制度": "scroll",
+  "知识": "book-open",
+  "搜索": "search",
+  "盘": "hard-drive",
+  "云": "cloud",
+  "存储": "database",
+  "设计": "palette",
+  "图片": "image",
+  "视频": "video",
+  "会议": "video",
+  "财务": "credit-card",
+  "审批": "check-square",
+  "假": "calendar",
+  "打卡": "map-pin",
+  "设置": "settings",
+  "工具": "tool",
+  "助手": "bot",
+  "问答": "message-circle-question"
+};
+
+function getIcon(name, customIcon) {
+  if (customIcon) return customIcon;
+  for (const key in iconMapping) {
+    if (name.includes(key)) return iconMapping[key];
+  }
+  return "layout-grid"; // 默认图标
+}
+
 const state = {
   catalog: [],
   activeSection: "all",
@@ -142,6 +179,11 @@ function renderCatalog() {
       </div>
     </section>
   `).join("");
+  
+  // 初始化 Lucide 图标
+  if (window.lucide) {
+    window.lucide.createIcons();
+  }
 }
 
 
@@ -150,16 +192,20 @@ function renderCard(item) {
   const label = typeLabels[item.type] || item.type;
   const isExternal = ["h5", "website", "tool"].includes(item.type);
   const target = isExternal ? 'target="_blank" rel="noopener noreferrer"' : "";
+  const iconName = getIcon(item.name, item.icon);
   
   return `
     <a class="resource-card-link" href="${item.url}" ${target} onclick="trackEvent('click', '${item.name}')">
       <article class="resource-card">
-        <div class="card-top">
-          <div>
+        <div class="card-icon">
+          <i data-lucide="${iconName}"></i>
+        </div>
+        <div class="card-content">
+          <div class="card-top">
             <h3>${item.name}</h3>
-            ${item.description ? `<p>${item.description}</p>` : ""}
+            <span class="type-pill ${typeClass}">${label}</span>
           </div>
-          <span class="type-pill ${typeClass}">${label}</span>
+          ${item.description ? `<p>${item.description}</p>` : ""}
         </div>
       </article>
     </a>

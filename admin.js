@@ -267,6 +267,7 @@ function editItem(sectionId, index) {
   document.getElementById("itemType").value = item.type;
   document.getElementById("itemTags").value = (item.tags || []).join(", ");
   document.getElementById("itemStatus").value = item.status || "";
+  document.getElementById("itemIcon").value = item.icon || "";
   
   document.getElementById("itemModal").style.display = "grid";
 }
@@ -290,7 +291,8 @@ document.getElementById("itemForm").addEventListener("submit", (e) => {
     url: document.getElementById("itemUrl").value,
     type: document.getElementById("itemType").value,
     tags: document.getElementById("itemTags").value.split(",").map(t => t.trim()).filter(t => t),
-    status: document.getElementById("itemStatus").value
+    status: document.getElementById("itemStatus").value,
+    icon: document.getElementById("itemIcon").value
   };
   
   if (index === "") {
