@@ -79,6 +79,7 @@ async function trackEvent(type, target) {
     });
   } catch (err) {}
 }
+window.trackEvent = trackEvent; // 显式暴露给全局
 
 function initPhotoViewer() {
   const photoDisplay = document.querySelector(".daily-photo-display img");
