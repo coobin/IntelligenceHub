@@ -50,6 +50,13 @@ app.use(cookieParser());
 
 // 鉴权中间件
 const authenticate = (req, res, next) => {
+  // 1. 优先检查 Authelia 的 SSO 身份
+  const remoteUser = req.headers["remote-user"];
+  if (remoteUser === "hekaixuan") {
+    return next();
+  }
+
+  // 2. 检查 Token
   const token = req.cookies.auth_token || req.headers.authorization?.split(" ")[1];
   if (token === TOKEN_SECRET) {
     next();
@@ -129,6 +136,7 @@ app.post("/api/track", (req, res) => {
       };
       stats.recent = [visitor, ...(stats.recent || [])].slice(0, 10);
     } else if (type === "click" && target) {
+      console.log(`[Track] Click registered for: ${target}`);
       stats.clicks[target] = (stats.clicks[target] || 0) + 1;
     }
 

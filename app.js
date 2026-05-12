@@ -69,17 +69,19 @@ async function bootstrap() {
 }
 
 async function trackEvent(type, target) {
+  console.log(`[App] Tracking event: ${type} - ${target}`);
   try {
-    // 使用 keepalive: true 确保页面跳转时请求不会被取消
     fetch("/api/track", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ type, target }),
       keepalive: true
     });
-  } catch (err) {}
+  } catch (err) {
+    console.error("[App] Tracking error:", err);
+  }
 }
-window.trackEvent = trackEvent; // 显式暴露给全局
+window.trackEvent = trackEvent;
 
 function initPhotoViewer() {
   const photoDisplay = document.querySelector(".daily-photo-display img");
