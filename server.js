@@ -160,7 +160,8 @@ app.use("/data/icons", express.static(ICONS_DIR));
 app.use(express.static(__dirname));
 
 // 后台管理页面路由
-app.get("/admin", (req, res) => {
+app.get("/admin", authenticate, (req, res) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
   res.sendFile(path.join(__dirname, "admin.html"));
 });
 
