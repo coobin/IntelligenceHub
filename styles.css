@@ -262,25 +262,24 @@ h1 {
   color: inherit;
 }
 
-.resource-card {
-  background: var(--surface) !important;
-  border: 1px solid var(--line) !important;
-  border-radius: 14px !important;
-  min-height: 90px !important;
-  padding: 20px !important;
+.hub-resource-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  min-height: 80px;
+  padding: 16px;
   display: flex !important;
-  flex-direction: row !important; /* 绝对强制横向 */
-  align-items: center !important; /* 绝对强制垂直居中 */
-  gap: 18px !important;
-  box-shadow: 0 4px 20px rgba(18, 32, 51, 0.04) !important;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 16px;
+  box-shadow: 0 4px 12px rgba(18, 32, 51, 0.04);
+  transition: all 0.2s ease;
 }
 
-.resource-card-link:hover .resource-card,
-.resource-card-link:focus-visible .resource-card {
+.resource-card-link:hover .hub-resource-card {
   border-color: var(--accent);
   transform: translateY(-2px);
-  box-shadow: 0 12px 32px rgba(37, 99, 235, 0.12);
+  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.1);
 }
 
 .card-icon {
@@ -320,18 +319,17 @@ h1 {
   margin-bottom: 4px;
 }
 
-.resource-card h3 {
+.hub-resource-card h3 {
   margin: 0;
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 700;
-  letter-spacing: -0.01em;
 }
 
-.resource-card p {
+.hub-resource-card p {
   color: var(--muted);
-  line-height: 1.55;
-  margin-bottom: 0;
-  font-size: 14px;
+  line-height: 1.4;
+  margin: 4px 0 0;
+  font-size: 13px;
 }
 
 .type-pill {

@@ -202,7 +202,7 @@ function renderCard(item) {
 
   return `
     <a class="resource-card-link" href="${item.url}" ${target} onclick="trackEvent('click', '${item.name}')">
-      <article class="resource-card">
+      <article class="hub-resource-card">
         <div class="card-icon">
           ${iconHtml}
         </div>
