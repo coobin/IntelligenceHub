@@ -364,6 +364,21 @@ h1 {
   height: 14px;
 }
 
+.card-action-note {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: var(--amber);
+  cursor: help;
+}
+
+.card-action-note svg {
+  width: 16px;
+  height: 16px;
+}
+
 .type-pill {
   align-self: start;
   color: #ffffff;

@@ -97,6 +97,11 @@ function renderActions(item) {
           ${action.icon ? `<i data-lucide="${escapeAttribute(action.icon)}"></i>` : ""}
           <span>${escapeHtml(action.label)}</span>
         </a>
+        ${action.note ? `
+          <span class="card-action-note" title="${escapeAttribute(action.note)}" aria-label="${escapeAttribute(action.note)}" role="img">
+            <i data-lucide="circle-alert"></i>
+          </span>
+        ` : ""}
       `).join("")}
     </div>
   `;

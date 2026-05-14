@@ -98,6 +98,7 @@
               "url": "./downloads/k3cloud-protocol.reg",
               "icon": "download",
               "download": true,
+              "note": "首次使用需下载并双击运行，完成注册表导入后即可打开客户端。",
               "trackName": "金蝶云星空客户端启动支持"
             }
           ]
