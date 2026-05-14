@@ -11,6 +11,7 @@ const ICONS_DIR = path.join(__dirname, "data/icons");
 const CATALOG_FILE = path.join(__dirname, "data/catalog.json");
 const STATS_FILE = path.join(__dirname, "data/stats.json");
 const ASSETS_DIR = path.join(__dirname, "assets");
+const DOWNLOADS_DIR = path.join(__dirname, "downloads");
 const DEFAULT_STATS = {
   pageViews: 0,
   clicks: {},
@@ -251,6 +252,15 @@ app.post("/api/upload-icon", authenticate, (req, res) => {
 
 // 静态文件服务
 app.use("/assets", express.static(ASSETS_DIR, { fallthrough: false }));
+app.use("/downloads", express.static(DOWNLOADS_DIR, {
+  fallthrough: false,
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith(".reg")) {
+      res.setHeader("Content-Type", "application/octet-stream");
+      res.setHeader("Content-Disposition", `attachment; filename="${path.basename(filePath)}"`);
+    }
+  }
+}));
 app.use("/data/icons", express.static(ICONS_DIR, { fallthrough: false }));
 
 app.get("/data/catalog.json", (req, res) => {

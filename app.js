@@ -86,6 +86,22 @@ function safeHttpUrl(value) {
   return /^https?:\/\//i.test(url) ? url : "#";
 }
 
+function renderActions(item) {
+  const actions = Array.isArray(item.actions) ? item.actions : [];
+  if (actions.length === 0) return "";
+
+  return `
+    <div class="card-actions">
+      ${actions.map((action) => `
+        <a class="card-action-link" href="${escapeAttribute(safeUrl(action.url))}" data-track-name="${escapeAttribute(action.trackName || action.label || item.name)}" ${action.download ? "download" : ""}>
+          ${action.icon ? `<i data-lucide="${escapeAttribute(action.icon)}"></i>` : ""}
+          <span>${escapeHtml(action.label)}</span>
+        </a>
+      `).join("")}
+    </div>
+  `;
+}
+
 async function bootstrap() {
   await loadConfigs();
   const response = await fetch("./data/catalog.json", { cache: "no-store" });
@@ -235,22 +251,24 @@ function renderCard(item) {
     : `<i data-lucide="${escapeAttribute(iconName)}"></i>`;
   const itemName = escapeHtml(item.name);
   const itemDescription = escapeHtml(item.description);
+  const actionsHtml = renderActions(item);
 
   return `
-    <a class="resource-card-link" href="${escapeAttribute(safeUrl(item.url))}" ${target} data-track-name="${escapeAttribute(item.name)}">
-      <article class="hub-resource-card">
-        <div class="card-icon">
-          ${iconHtml}
-        </div>
-        <div class="card-content">
+    <article class="hub-resource-card">
+      <div class="card-icon">
+        ${iconHtml}
+      </div>
+      <div class="card-content">
+        <a class="resource-card-link" href="${escapeAttribute(safeUrl(item.url))}" ${target} data-track-name="${escapeAttribute(item.name)}">
           <div class="card-top">
             <h3>${itemName}</h3>
             <span class="type-pill ${escapeAttribute(typeClass)}">${escapeHtml(label)}</span>
           </div>
           ${item.description ? `<p>${itemDescription}</p>` : ""}
-        </div>
-      </article>
-    </a>
+        </a>
+        ${actionsHtml}
+      </div>
+    </article>
   `;
 }
 

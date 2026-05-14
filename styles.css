@@ -276,7 +276,7 @@ h1 {
   transition: all 0.2s ease;
 }
 
-.resource-card-link:hover .hub-resource-card {
+.hub-resource-card:hover {
   border-color: var(--accent);
   transform: translateY(-2px);
   box-shadow: 0 8px 24px rgba(37, 99, 235, 0.1);
@@ -295,7 +295,7 @@ h1 {
   transition: all 0.3s ease;
 }
 
-.resource-card-link:hover .card-icon {
+.hub-resource-card:hover .card-icon {
   background: var(--accent);
   color: #ffffff;
   transform: scale(1.05);
@@ -330,6 +330,38 @@ h1 {
   line-height: 1.4;
   margin: 4px 0 0;
   font-size: 13px;
+}
+
+.card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.card-action-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  border-radius: 6px;
+  padding: 4px 8px;
+  color: var(--accent);
+  background: rgba(37, 99, 235, 0.06);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.card-action-link:hover {
+  border-color: var(--accent);
+  background: rgba(37, 99, 235, 0.12);
+}
+
+.card-action-link svg {
+  width: 14px;
+  height: 14px;
 }
 
 .type-pill {
@@ -693,4 +725,3 @@ h1 {
   transform: translateY(-2px);
   border-color: rgba(255, 255, 255, 0.3);
 }
-
