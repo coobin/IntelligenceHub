@@ -1,11 +1,10 @@
-const CACHE_NAME = "intelligence-hub-v29";
+const CACHE_NAME = "intelligence-hub-v30";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
   "./config.js",
-  "./data/catalog.json",
   "./manifest.webmanifest",
   "./assets/icons/icon.svg",
   "./assets/icons/maskable.svg"
@@ -29,10 +28,22 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+  const url = new URL(event.request.url);
+
+  if (url.origin === self.location.origin && (
+    url.pathname.startsWith("/api/") ||
+    url.pathname === "/admin" ||
+    url.pathname === "/admin.js" ||
+    url.pathname === "/data/catalog.json" ||
+    url.pathname === "/config.local.js"
+  )) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
 
   event.respondWith(
     fetch(event.request).then((response) => {
-      if (response.ok && new URL(event.request.url).origin === self.location.origin) {
+      if (response.ok && url.origin === self.location.origin) {
         const copy = response.clone();
         caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
       }

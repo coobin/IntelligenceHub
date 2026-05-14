@@ -1,11 +1,27 @@
 let catalog = { sections: [] };
 
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "\"": "&quot;",
+    "'": "&#39;"
+  }[char]));
+}
+
+function escapeAttribute(value) {
+  return escapeHtml(value).replace(/`/g, "&#96;");
+}
+
+function toNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
+}
+
 // 页面加载逻辑
 document.addEventListener("DOMContentLoaded", async () => {
-  const token = localStorage.getItem("cih_token");
-  const authRes = await fetch("/api/check-auth", {
-    headers: { "Authorization": `Bearer ${token}` }
-  });
+  const authRes = await fetch("/api/check-auth");
   const { authenticated } = await authRes.json();
   
   if (authenticated) {
@@ -43,17 +59,15 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
   
   const data = await res.json();
   if (data.success) {
-    localStorage.setItem("cih_token", data.token);
     showAdmin();
   } else {
-    alert(data.message);
+    alert(data.message || "登录失败");
   }
 });
 
 // 退出登录
 document.getElementById("logoutBtn").addEventListener("click", async () => {
   await fetch("/api/logout", { method: "POST" });
-  localStorage.removeItem("cih_token");
   showLogin();
 });
 
@@ -78,22 +92,17 @@ document.getElementById("tabEditor").addEventListener("click", (e) => {
 
 // 加载数据
 async function loadCatalog() {
-  const token = localStorage.getItem("cih_token");
-  const res = await fetch("/api/catalog", {
-    headers: { "Authorization": `Bearer ${token}` }
-  });
+  const res = await fetch("/api/catalog", { cache: "no-store" });
   catalog = await res.json();
   renderAdmin();
 }
 
 // 保存数据
 async function saveCatalog() {
-  const token = localStorage.getItem("cih_token");
   const res = await fetch("/api/catalog", {
     method: "POST",
     headers: { 
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}`
+      "Content-Type": "application/json"
     },
     body: JSON.stringify(catalog)
   });
@@ -107,18 +116,15 @@ async function saveCatalog() {
 
 // 加载统计数据
 async function loadStats() {
-  const token = localStorage.getItem("cih_token");
-  const res = await fetch("/api/stats", {
-    headers: { "Authorization": `Bearer ${token}` }
-  });
+  const res = await fetch("/api/stats", { cache: "no-store" });
   const stats = await res.json();
   renderStats(stats);
 }
 
 function renderStats(stats) {
   const today = new Date().toISOString().split("T")[0];
-  document.getElementById("totalPV").innerText = stats.pageViews || 0;
-  document.getElementById("todayPV").innerText = stats.daily[today] || 0;
+  document.getElementById("totalPV").innerText = toNumber(stats.pageViews);
+  document.getElementById("todayPV").innerText = toNumber(stats.daily?.[today]);
   
   const totalItems = catalog.sections.reduce((sum, s) => sum + s.items.length, 0);
   document.getElementById("activeEntries").innerText = totalItems;
@@ -129,15 +135,15 @@ function renderStats(stats) {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5);
   
-  const maxClicks = sortedClicks[0]?.[1] || 1;
+  const maxClicks = toNumber(sortedClicks[0]?.[1]) || 1;
   
   rankList.innerHTML = sortedClicks.map(([name, count]) => `
     <div class="rank-item">
-      <span style="width: 100px; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${name}</span>
+      <span style="width: 100px; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(name)}</span>
       <div class="bar-outer">
-        <div class="bar-inner" style="width: ${(count / maxClicks) * 100}%"></div>
+        <div class="bar-inner" style="width: ${(toNumber(count) / maxClicks) * 100}%"></div>
       </div>
-      <span style="font-weight: 600; color: #1e293b;">${count}</span>
+      <span style="font-weight: 600; color: #1e293b;">${toNumber(count)}</span>
     </div>
   `).join("") || '<p style="color:#94a3b8; text-align:center; padding:20px;">暂无点击数据</p>';
 
@@ -150,16 +156,16 @@ function renderStats(stats) {
     days.push(d.toISOString().split("T")[0]);
   }
 
-  const maxDaily = Math.max(...days.map(d => stats.daily[d] || 0), 1);
+  const maxDaily = Math.max(...days.map(d => toNumber(stats.daily?.[d])), 1);
 
   trendList.innerHTML = days.map(d => {
-    const val = stats.daily[d] || 0;
+    const val = toNumber(stats.daily?.[d]);
     const height = (val / maxDaily) * 100;
     const label = d.split("-").slice(1).join("/");
     return `
       <div style="flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%;">
         <div style="flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center;">
-          <div style="width: 100%; max-width: 30px; height: ${height}%; background: var(--admin-accent); border-radius: 4px; position: relative;" title="${d}: ${val}">
+          <div style="width: 100%; max-width: 30px; height: ${height}%; background: var(--admin-accent); border-radius: 4px; position: relative;" title="${escapeAttribute(`${d}: ${val}`)}">
             ${val > 0 ? `<span style="position: absolute; top: -20px; left: 50%; transform: translateX(-50%); font-size: 10px; color: #64748b;">${val}</span>` : ""}
           </div>
         </div>
@@ -183,9 +189,9 @@ function renderStats(stats) {
       <tbody>
         ${(stats.recent || []).map(r => `
           <tr style="border-bottom: 1px solid #f8fafc;">
-            <td style="padding: 12px 8px; color: #1e293b;">${r.time}</td>
-            <td style="padding: 12px 8px;"><span style="font-weight: 600; color: var(--admin-accent);">${r.user || "未知"}</span></td>
-            <td style="padding: 12px 8px;"><code style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px;">${r.ip}</code></td>
+            <td style="padding: 12px 8px; color: #1e293b;">${escapeHtml(r.time)}</td>
+            <td style="padding: 12px 8px;"><span style="font-weight: 600; color: var(--admin-accent);">${escapeHtml(r.user || "未知")}</span></td>
+            <td style="padding: 12px 8px;"><code style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px;">${escapeHtml(r.ip)}</code></td>
             <td style="padding: 12px 8px; color: #64748b; font-size: 12px;">${parseUA(r.ua)}</td>
           </tr>
         `).join("") || '<tr><td colspan="4" style="text-align:center; padding:20px; color:#94a3b8;">暂无记录</td></tr>'}
@@ -210,13 +216,13 @@ function renderAdmin() {
     <div class="section-editor">
       <div class="section-header">
         <div>
-          <h2 style="margin:0">${section.title} <small style="color:#94a3b8; font-weight:normal; font-size:14px;">(${section.id})</small></h2>
-          <p style="margin:4px 0 0; color:#64748b; font-size:13px;">${section.description || "无描述"}</p>
+          <h2 style="margin:0">${escapeHtml(section.title)} <small style="color:#94a3b8; font-weight:normal; font-size:14px;">(${escapeHtml(section.id)})</small></h2>
+          <p style="margin:4px 0 0; color:#64748b; font-size:13px;">${escapeHtml(section.description || "无描述")}</p>
         </div>
         <div style="display:flex; gap:8px;">
-          <button class="btn btn-ghost" onclick="editSection(${sIndex})">编辑分类</button>
-          <button class="btn btn-danger" onclick="deleteSection(${sIndex})">删除分类</button>
-          <button class="btn btn-primary" onclick="addItem('${section.id}')">+ 添加项目</button>
+          <button class="btn btn-ghost" data-action="edit-section" data-section-index="${sIndex}">编辑分类</button>
+          <button class="btn btn-danger" data-action="delete-section" data-section-index="${sIndex}">删除分类</button>
+          <button class="btn btn-primary" data-action="add-item" data-section-id="${escapeAttribute(section.id)}">+ 添加项目</button>
         </div>
       </div>
       <div class="items-list">
@@ -229,16 +235,16 @@ function renderAdmin() {
         </div>
         ${section.items.map((item, iIndex) => `
           <div class="item-row">
-            <div style="font-weight:600">${item.name}</div>
+            <div style="font-weight:600">${escapeHtml(item.name)}</div>
             <div style="font-size:13px; color:#64748b;">
-              <div>${item.description || "-"}</div>
-              <div style="color:#94a3b8; font-family:monospace; font-size:11px;">${item.url}</div>
+              <div>${escapeHtml(item.description || "-")}</div>
+              <div style="color:#94a3b8; font-family:monospace; font-size:11px;">${escapeHtml(item.url)}</div>
             </div>
-            <div><span class="type-pill type-${item.type}" style="font-size:11px;">${item.type}</span></div>
-            <div style="font-size:12px;">${item.status || "-"}</div>
+            <div><span class="type-pill type-${escapeAttribute(item.type)}" style="font-size:11px;">${escapeHtml(item.type)}</span></div>
+            <div style="font-size:12px;">${escapeHtml(item.status || "-")}</div>
             <div style="display:flex; gap:4px;">
-              <button class="btn btn-ghost" style="padding:4px 8px;" onclick="editItem('${section.id}', ${iIndex})">编辑</button>
-              <button class="btn btn-danger" style="padding:4px 8px;" onclick="deleteItem('${section.id}', ${iIndex})">删除</button>
+              <button class="btn btn-ghost" style="padding:4px 8px;" data-action="edit-item" data-section-id="${escapeAttribute(section.id)}" data-item-index="${iIndex}">编辑</button>
+              <button class="btn btn-danger" style="padding:4px 8px;" data-action="delete-item" data-section-id="${escapeAttribute(section.id)}" data-item-index="${iIndex}">删除</button>
             </div>
           </div>
         `).join("")}
@@ -246,6 +252,32 @@ function renderAdmin() {
     </div>
   `).join("");
 }
+
+document.getElementById("sectionsList").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-action]");
+  if (!button) return;
+
+  const sectionIndex = Number(button.dataset.sectionIndex);
+  const itemIndex = Number(button.dataset.itemIndex);
+
+  switch (button.dataset.action) {
+    case "edit-section":
+      editSection(sectionIndex);
+      break;
+    case "delete-section":
+      deleteSection(sectionIndex);
+      break;
+    case "add-item":
+      addItem(button.dataset.sectionId);
+      break;
+    case "edit-item":
+      editItem(button.dataset.sectionId, itemIndex);
+      break;
+    case "delete-item":
+      deleteItem(button.dataset.sectionId, itemIndex);
+      break;
+  }
+});
 
 // --- Item 操作 ---
 function addItem(sectionId) {
@@ -314,7 +346,6 @@ function closeModal() {
 async function uploadIcon(input) {
   if (!input.files || !input.files[0]) return;
   
-  const token = localStorage.getItem("cih_token");
   const formData = new FormData();
   formData.append("icon", input.files[0]);
   
@@ -326,7 +357,6 @@ async function uploadIcon(input) {
   try {
     const res = await fetch("/api/upload-icon", {
       method: "POST",
-      headers: { "Authorization": `Bearer ${token}` },
       body: formData
     });
     const data = await res.json();

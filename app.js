@@ -55,9 +55,40 @@ const assistantToggle = document.querySelector("#assistantToggle");
 const assistantClose = document.querySelector("#assistantClose");
 const assistantPanel = document.querySelector("#assistantPanel");
 
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "\"": "&quot;",
+    "'": "&#39;"
+  }[char]));
+}
+
+function escapeAttribute(value) {
+  return escapeHtml(value).replace(/`/g, "&#96;");
+}
+
+function safeUrl(value) {
+  const url = String(value || "").trim();
+  if (!url) return "#";
+  const schemeMatch = url.match(/^([a-z][a-z0-9+.-]*):/i);
+  if (schemeMatch) {
+    const scheme = schemeMatch[1].toLowerCase();
+    return ["javascript", "data", "vbscript", "file", "blob"].includes(scheme) ? "#" : url;
+  }
+  if (/^(\/|\.\/|\.\.\/|data\/icons\/|assets\/)/.test(url)) return url;
+  return "#";
+}
+
+function safeHttpUrl(value) {
+  const url = String(value || "").trim();
+  return /^https?:\/\//i.test(url) ? url : "#";
+}
+
 async function bootstrap() {
   await loadConfigs();
-  const response = await fetch("./data/catalog.json");
+  const response = await fetch("./data/catalog.json", { cache: "no-store" });
   const data = await response.json();
   state.catalog = data.sections;
   renderNavigation();
@@ -142,8 +173,8 @@ function renderNavigation() {
   ];
 
   sectionNav.innerHTML = navItems.map((item) => `
-    <button class="nav-button ${item.id === state.activeSection ? "active" : ""}" data-section="${item.id}">
-      <span>${item.title}</span>
+    <button class="nav-button ${item.id === state.activeSection ? "active" : ""}" data-section="${escapeAttribute(item.id)}">
+      <span>${escapeHtml(item.title)}</span>
       <span class="nav-count">${item.count}</span>
     </button>
   `).join("");
@@ -169,11 +200,11 @@ function renderCatalog() {
   }
 
   catalogArea.innerHTML = filteredSections.map((section) => `
-    <section class="catalog-section" id="section-${section.id}">
+    <section class="catalog-section" id="section-${escapeAttribute(section.id)}">
       <div class="section-heading">
         <div>
-          <h2>${section.title}</h2>
-          ${section.description ? `<p>${section.description}</p>` : ""}
+          <h2>${escapeHtml(section.title)}</h2>
+          ${section.description ? `<p>${escapeHtml(section.description)}</p>` : ""}
         </div>
         <span class="status-text">${section.items.length} 项</span>
       </div>
@@ -200,21 +231,23 @@ function renderCard(item) {
   // 判断是 Lucide 图标还是图片路径
   const isImageIcon = iconName && (iconName.includes("/") || iconName.includes("."));
   const iconHtml = isImageIcon 
-    ? `<img src="${iconName}" alt="" style="width: 24px; height: 24px; object-fit: contain;">`
-    : `<i data-lucide="${iconName}"></i>`;
+    ? `<img src="${escapeAttribute(safeUrl(iconName))}" alt="" style="width: 24px; height: 24px; object-fit: contain;">`
+    : `<i data-lucide="${escapeAttribute(iconName)}"></i>`;
+  const itemName = escapeHtml(item.name);
+  const itemDescription = escapeHtml(item.description);
 
   return `
-    <a class="resource-card-link" href="${item.url}" ${target} onclick="trackEvent('click', '${item.name}')">
+    <a class="resource-card-link" href="${escapeAttribute(safeUrl(item.url))}" ${target} data-track-name="${escapeAttribute(item.name)}">
       <article class="hub-resource-card">
         <div class="card-icon">
           ${iconHtml}
         </div>
         <div class="card-content">
           <div class="card-top">
-            <h3>${item.name}</h3>
-            <span class="type-pill ${typeClass}">${label}</span>
+            <h3>${itemName}</h3>
+            <span class="type-pill ${escapeAttribute(typeClass)}">${escapeHtml(label)}</span>
           </div>
-          ${item.description ? `<p>${item.description}</p>` : ""}
+          ${item.description ? `<p>${itemDescription}</p>` : ""}
         </div>
       </article>
     </a>
@@ -231,7 +264,7 @@ function renderAssistant() {
 
   if (config.fastgptChatUrl) {
     document.querySelector("#assistantFrame").innerHTML = `
-      <iframe title="${title}" src="${config.fastgptChatUrl}" allow="clipboard-read; clipboard-write"></iframe>
+      <iframe title="${escapeAttribute(title)}" src="${escapeAttribute(safeHttpUrl(config.fastgptChatUrl))}" allow="clipboard-read; clipboard-write"></iframe>
     `;
   }
 }
@@ -260,6 +293,12 @@ assistantClose.addEventListener("click", () => {
   setAssistantOpen(false);
 });
 
+catalogArea.addEventListener("click", (event) => {
+  const link = event.target.closest("[data-track-name]");
+  if (!link) return;
+  trackEvent("click", link.dataset.trackName);
+});
+
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     setAssistantOpen(false);
@@ -267,5 +306,5 @@ document.addEventListener("keydown", (event) => {
 });
 
 bootstrap().catch((error) => {
-  catalogArea.innerHTML = `<div class="empty-state">资源数据加载失败：${error.message}</div>`;
+  catalogArea.innerHTML = `<div class="empty-state">资源数据加载失败：${escapeHtml(error.message)}</div>`;
 });
