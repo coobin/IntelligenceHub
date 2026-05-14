@@ -85,7 +85,7 @@
           "icon": "messages-square"
         },
         {
-          "name": "金蝶云星空客户端",
+          "name": "金蝶云星空(仅支持 Windows)",
           "description": "",
           "url": "k3cloud://chengxi.ik3cloud.com/k3cloud/clientbin/k3cloudclient/k3cloudclient.manifest",
           "type": "client",

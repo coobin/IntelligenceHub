@@ -318,8 +318,10 @@ document.getElementById("itemForm").addEventListener("submit", (e) => {
   const sectionId = document.getElementById("editSectionId").value;
   const index = document.getElementById("editItemIndex").value;
   const section = catalog.sections.find(s => s.id === sectionId);
+  const existingItem = index === "" ? {} : (section.items[index] || {});
   
   const item = {
+    ...existingItem,
     name: document.getElementById("itemName").value,
     description: document.getElementById("itemDesc").value,
     url: document.getElementById("itemUrl").value,
