@@ -91,7 +91,7 @@ function renderActions(item) {
   if (actions.length === 0) return "";
 
   return `
-    <div class="card-actions">
+    <span class="card-actions">
       ${actions.map((action) => `
         <a class="card-action-link" href="${escapeAttribute(safeUrl(action.url))}" data-track-name="${escapeAttribute(action.trackName || action.label || item.name)}" ${action.download ? "download" : ""}>
           ${action.icon ? `<i data-lucide="${escapeAttribute(action.icon)}"></i>` : ""}
@@ -103,7 +103,7 @@ function renderActions(item) {
           </span>
         ` : ""}
       `).join("")}
-    </div>
+    </span>
   `;
 }
 
@@ -269,9 +269,8 @@ function renderCard(item) {
             <h3>${itemName}</h3>
             <span class="type-pill ${escapeAttribute(typeClass)}">${escapeHtml(label)}</span>
           </div>
-          ${item.description ? `<p>${itemDescription}</p>` : ""}
+          ${item.description ? `<p>${itemDescription}${actionsHtml}</p>` : actionsHtml}
         </a>
-        ${actionsHtml}
       </div>
     </article>
   `;
