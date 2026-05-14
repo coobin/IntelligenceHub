@@ -11,7 +11,8 @@
           "url": "https://mailsso.chencytech.com",
           "type": "h5",
           "tags": ["邮箱", "办公"],
-          "status": "内部系统"
+          "status": "内部系统",
+          "icon": "mail"
         },
         {
           "name": "承希云盘",
@@ -19,7 +20,8 @@
           "url": "https://cloud.chencytech.com",
           "type": "h5",
           "tags": ["文件", "协作"],
-          "status": "内部系统"
+          "status": "内部系统",
+          "icon": "hard-drive"
         },
         {
           "name": "云之家",
@@ -27,7 +29,8 @@
           "url": "https://www.yunzhijia.com/home/?m=open&a=login",
           "type": "h5",
           "tags": ["协同", "办公"],
-          "status": "外部入口"
+          "status": "外部入口",
+          "icon": "messages-square"
         },
         {
           "name": "金蝶云星空",
@@ -35,7 +38,8 @@
           "url": "https://kingdeesso.chencytech.com",
           "type": "h5",
           "tags": ["财务", "ERP"],
-          "status": "内部系统"
+          "status": "内部系统",
+          "icon": "chart-no-axes-combined"
         },
         {
           "name": "薪人薪事",
@@ -43,7 +47,8 @@
           "url": "https://xrxs.chencytech.com",
           "type": "h5",
           "tags": ["HR", "薪酬"],
-          "status": "内部系统"
+          "status": "内部系统",
+          "icon": "users"
         },
         {
           "name": "魔学院",
@@ -51,7 +56,8 @@
           "url": "https://moxueyuan.chencytech.com",
           "type": "h5",
           "tags": ["学习", "培训"],
-          "status": "内部系统"
+          "status": "内部系统",
+          "icon": "graduation-cap"
         }
       ]
     },
@@ -66,7 +72,8 @@
           "url": "weixin://",
           "type": "client",
           "tags": ["IM", "客户端"],
-          "status": "需本机安装"
+          "status": "需本机安装",
+          "icon": "message-circle"
         },
         {
           "name": "云之家",
@@ -74,7 +81,8 @@
           "url": "cloudhub://",
           "type": "client",
           "tags": ["协同", "客户端"],
-          "status": "需本机安装"
+          "status": "需本机安装",
+          "icon": "messages-square"
         }
       ]
     },
@@ -89,7 +97,8 @@
           "url": "https://pdf.chencytech.com",
           "type": "tool",
           "tags": ["PDF", "转换"],
-          "status": "内部工具"
+          "status": "内部工具",
+          "icon": "file-type-2"
         },
         {
           "name": "流程图制作",
@@ -97,7 +106,8 @@
           "url": "https://drawio.chencytech.com",
           "type": "tool",
           "tags": ["绘图", "流程图"],
-          "status": "内部工具"
+          "status": "内部工具",
+          "icon": "workflow"
         },
         {
           "name": "思维导图",
@@ -105,7 +115,8 @@
           "url": "https://mind.chencytech.com",
           "type": "tool",
           "tags": ["脑图", "梳理"],
-          "status": "内部工具"
+          "status": "内部工具",
+          "icon": "network"
         }
       ]
     },
@@ -120,7 +131,8 @@
           "url": "https://www.doubao.com",
           "type": "website",
           "tags": ["AI", "助手"],
-          "status": "外部站点"
+          "status": "外部站点",
+          "icon": "bot"
         },
         {
           "name": "DeepSeek",
@@ -128,7 +140,8 @@
           "url": "https://chat.deepseek.com",
           "type": "website",
           "tags": ["AI", "大模型"],
-          "status": "外部站点"
+          "status": "外部站点",
+          "icon": "brain-circuit"
         }
       ]
     }
