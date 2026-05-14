@@ -257,6 +257,9 @@ function renderCard(item) {
   const itemName = escapeHtml(item.name);
   const itemDescription = escapeHtml(item.description);
   const actionsHtml = renderActions(item);
+  const detailHtml = item.description
+    ? `<p>${itemDescription}</p>`
+    : actionsHtml;
 
   return `
     <article class="hub-resource-card">
@@ -269,8 +272,8 @@ function renderCard(item) {
             <h3>${itemName}</h3>
             <span class="type-pill ${escapeAttribute(typeClass)}">${escapeHtml(label)}</span>
           </div>
-          ${item.description ? `<p>${itemDescription}${actionsHtml}</p>` : actionsHtml}
         </a>
+        ${detailHtml}
       </div>
     </article>
   `;

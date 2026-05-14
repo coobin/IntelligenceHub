@@ -86,7 +86,7 @@
         },
         {
           "name": "金蝶云星空客户端",
-          "description": "Windows 桌面客户端入口，首次使用需安装启动支持。",
+          "description": "",
           "url": "k3cloud://chengxi.ik3cloud.com/k3cloud/clientbin/k3cloudclient/k3cloudclient.manifest",
           "type": "client",
           "tags": ["财务", "ERP", "客户端"],
