@@ -39,7 +39,7 @@
    cp config.js config.local.js
    cp .env.example .env
    ```
-   并在 `config.local.js` 中配置您的 FastGPT 嵌入链接。如需启用本地账号密码登录，请在 `.env` 中设置 `ADMIN_PASSWORD` 和 `AUTH_TOKEN_SECRET`；Authelia 传入 `remote-user=hekaixuan` 时仍可直接访问后台。
+   并在 `config.local.js` 中配置您的 FastGPT 嵌入链接；后台权限由 Authelia 传入的 `remote-user` 控制，默认允许 `hekaixuan`。
 3. 启动容器：
    ```bash
    docker-compose up -d --build
@@ -57,7 +57,7 @@
 ## ⚙️ 管理员操作
 
 - **访问地址**：`https://your-domain/admin`
-- **本地账号**：由环境变量 `ADMIN_USER`、`ADMIN_PASSWORD` 和 `AUTH_TOKEN_SECRET` 定义；未设置 `ADMIN_PASSWORD` 时仅允许 Authelia 直通或已有有效 Cookie。
+- **后台权限**：由 Authelia 的 `remote-user` 请求头控制，可通过环境变量 `ADMIN_REMOTE_USER` 调整允许访问的账号。
 - **功能切换**：左侧边栏可快速切换“数据仪表盘”与“导航目录编辑”。
 
 ## 📄 开源协议

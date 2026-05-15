@@ -3,7 +3,6 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import { fileURLToPath } from "url";
-import cookieParser from "cookie-parser";
 import multer from "multer";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -104,51 +103,20 @@ const port = process.env.PORT || 80;
 
 app.set("trust proxy", 1);
 
-const AUTH_USER = process.env.ADMIN_USER || "kay";
-const AUTH_PASS = process.env.ADMIN_PASSWORD || "";
-const TOKEN_SECRET = process.env.AUTH_TOKEN_SECRET || crypto.randomBytes(32).toString("hex");
-const COOKIE_OPTIONS = {
-  httpOnly: true,
-  maxAge: 86400000,
-  path: "/",
-  sameSite: "Lax",
-  secure: process.env.COOKIE_SECURE === "true"
-};
-
-if (!AUTH_PASS) {
-  console.warn("[Auth] ADMIN_PASSWORD 未设置，本地账号密码登录已禁用，仅允许 Authelia remote-user 直通或已有有效 Cookie。");
-}
+const ADMIN_REMOTE_USER = process.env.ADMIN_REMOTE_USER || "hekaixuan";
 
 app.use(express.json());
-app.use(cookieParser());
 
 // 鉴权中间件
 const authenticate = (req, res, next) => {
   // 1. 优先检查 Authelia 的 SSO 身份
   const remoteUser = req.headers["remote-user"];
-  if (remoteUser === "hekaixuan") {
+  if (remoteUser === ADMIN_REMOTE_USER) {
     return next();
   }
 
-  // 2. 检查 Token
-  const token = req.cookies.auth_token || req.headers.authorization?.split(" ")[1];
-  if (token === TOKEN_SECRET) {
-    next();
-  } else {
-    res.status(401).json({ success: false, message: "Unauthorized" });
-  }
+  res.status(401).json({ success: false, message: "Unauthorized" });
 };
-
-// 登录接口
-app.post("/api/login", (req, res) => {
-  const { username, password } = req.body;
-  if (AUTH_PASS && username === AUTH_USER && password === AUTH_PASS) {
-    res.cookie("auth_token", TOKEN_SECRET, COOKIE_OPTIONS);
-    res.json({ success: true });
-  } else {
-    res.status(401).json({ success: false, message: "用户名或密码错误" });
-  }
-});
 
 // 获取配置接口
 app.get("/api/catalog", (req, res) => {
@@ -174,19 +142,12 @@ app.post("/api/catalog", authenticate, (req, res) => {
   }
 });
 
-// 登出接口
-app.post("/api/logout", (req, res) => {
-  res.clearCookie("auth_token", { path: "/", sameSite: "Lax", secure: COOKIE_OPTIONS.secure });
-  res.json({ success: true });
-});
-
 // 检查登录状态
 app.get("/api/check-auth", (req, res) => {
   const remoteUser = req.headers["remote-user"];
-  const token = req.cookies.auth_token || req.headers.authorization?.split(" ")[1];
   
-  // 如果是 SSO 指定用户，或者有正确 Token，都视为已登录
-  const authenticated = (remoteUser === "hekaixuan") || (token === TOKEN_SECRET);
+  // 如果是 SSO 指定用户，则视为已登录
+  const authenticated = remoteUser === ADMIN_REMOTE_USER;
   res.json({ authenticated });
 });
 

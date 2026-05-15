@@ -26,50 +26,22 @@ document.addEventListener("DOMContentLoaded", async () => {
   
   if (authenticated) {
     showAdmin();
-    loadCatalog();
-    loadStats();
   } else {
-    showLogin();
+    showAccessDenied();
   }
 });
 
-function showLogin() {
-  document.getElementById("loginView").classList.remove("hidden");
+function showAccessDenied() {
+  document.getElementById("accessDeniedView").classList.remove("hidden");
   document.getElementById("adminView").classList.add("hidden");
 }
 
 async function showAdmin() {
-  document.getElementById("loginView").classList.add("hidden");
+  document.getElementById("accessDeniedView").classList.add("hidden");
   document.getElementById("adminView").classList.remove("hidden");
   await loadCatalog();
   await loadStats();
 }
-
-// 登录处理
-document.getElementById("loginForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const username = document.getElementById("username").value;
-  const password = document.getElementById("password").value;
-  
-  const res = await fetch("/api/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password })
-  });
-  
-  const data = await res.json();
-  if (data.success) {
-    showAdmin();
-  } else {
-    alert(data.message || "登录失败");
-  }
-});
-
-// 退出登录
-document.getElementById("logoutBtn").addEventListener("click", async () => {
-  await fetch("/api/logout", { method: "POST" });
-  showLogin();
-});
 
 // Tab 切换逻辑
 document.getElementById("tabDashboard").addEventListener("click", (e) => {

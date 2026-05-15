@@ -18,36 +18,35 @@
         font-family: Inter, system-ui, sans-serif;
       }
 
-      .login-container {
+      .access-denied {
         display: grid;
         place-items: center;
         min-height: 100vh;
       }
 
-      .login-card {
+      .access-card {
         background: white;
         padding: 40px;
-        border-radius: 16px;
+        border-radius: 12px;
         box-shadow: 0 10px 25px rgba(0,0,0,0.05);
         width: 100%;
         max-width: 400px;
+        text-align: center;
       }
 
-      .login-card h1 {
-        margin-bottom: 24px;
+      .access-card h1 {
+        margin-bottom: 12px;
         font-size: 24px;
-        text-align: center;
+      }
+
+      .access-card p {
+        color: #64748b;
+        line-height: 1.6;
+        margin-bottom: 24px;
       }
 
       .form-group {
         margin-bottom: 16px;
-      }
-
-      .form-group label {
-        display: block;
-        margin-bottom: 8px;
-        font-size: 14px;
-        color: #64748b;
       }
 
       .form-group input {
@@ -62,15 +61,17 @@
         border-color: var(--admin-accent);
       }
 
-      .login-btn {
-        width: 100%;
+      .access-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         padding: 12px;
         background: var(--admin-accent);
         color: white;
         border: 0;
         border-radius: 8px;
         font-weight: 600;
-        cursor: pointer;
+        text-decoration: none;
       }
 
       .admin-layout {
@@ -240,21 +241,12 @@
     </style>
   </head>
   <body class="admin-body">
-    <!-- 登录界面 -->
-    <div id="loginView" class="login-container">
-      <div class="login-card">
-        <h1>承希智汇后台</h1>
-        <form id="loginForm">
-          <div class="form-group">
-            <label>用户名</label>
-            <input type="text" id="username" required />
-          </div>
-          <div class="form-group">
-            <label>密码</label>
-            <input type="password" id="password" required />
-          </div>
-          <button type="submit" class="login-btn">登录</button>
-        </form>
+    <!-- 无权限界面 -->
+    <div id="accessDeniedView" class="access-denied hidden">
+      <div class="access-card">
+        <h1>无法访问后台</h1>
+        <p>当前账号没有后台管理权限。如需访问，请先通过统一身份认证授权。</p>
+        <a class="access-link" href="/">返回首页</a>
       </div>
     </div>
 
@@ -274,7 +266,6 @@
           <a href="/" class="nav-link">
             <span>返回首页</span>
           </a>
-          <button id="logoutBtn" class="btn btn-danger" style="margin-top: 20px; width: 100%; padding: 12px;">退出登录</button>
         </nav>
       </aside>
       
