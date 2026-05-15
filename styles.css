@@ -270,12 +270,16 @@ h1 {
 }
 
 .resource-card-link {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
   display: block;
   text-decoration: none;
   color: inherit;
 }
 
 .hub-resource-card {
+  position: relative;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -326,6 +330,13 @@ h1 {
   stroke-width: 2;
 }
 
+.card-icon,
+.card-content {
+  position: relative;
+  z-index: 2;
+  pointer-events: none;
+}
+
 .card-content {
   flex: 1;
   min-width: 0;
@@ -357,9 +368,12 @@ h1 {
   gap: 4px;
   margin-top: 4px;
   vertical-align: middle;
+  pointer-events: auto;
 }
 
 .card-action-link {
+  position: relative;
+  z-index: 3;
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -380,6 +394,8 @@ h1 {
 }
 
 .card-action-note {
+  position: relative;
+  z-index: 3;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -387,6 +403,7 @@ h1 {
   height: 16px;
   color: var(--amber);
   cursor: help;
+  pointer-events: auto;
 }
 
 .card-action-note svg {

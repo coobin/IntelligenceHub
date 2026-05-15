@@ -262,20 +262,18 @@ function renderCard(item) {
     ? `<p>${itemDescription}</p>`
     : actionsHtml;
   const itemUrl = escapeAttribute(safeUrl(item.url));
-  const itemTarget = isExternal ? "_blank" : "_self";
 
   return `
-    <article class="hub-resource-card" data-card-url="${itemUrl}" data-card-target="${itemTarget}" data-track-name="${escapeAttribute(item.name)}" tabindex="0" role="link" aria-label="${escapeAttribute(item.name)}">
+    <article class="hub-resource-card">
+      <a class="resource-card-link" href="${itemUrl}" ${target} data-track-name="${escapeAttribute(item.name)}" aria-label="${escapeAttribute(item.name)}"></a>
       <div class="card-icon">
         ${iconHtml}
       </div>
       <div class="card-content">
-        <a class="resource-card-link" href="${itemUrl}" ${target}>
-          <div class="card-top">
-            <h3>${itemName}</h3>
-            <span class="type-pill ${escapeAttribute(typeClass)}">${escapeHtml(label)}</span>
-          </div>
-        </a>
+        <div class="card-top">
+          <h3>${itemName}</h3>
+          <span class="type-pill ${escapeAttribute(typeClass)}">${escapeHtml(label)}</span>
+        </div>
         ${detailHtml}
       </div>
     </article>
@@ -334,32 +332,9 @@ assistantClose.addEventListener("click", () => {
 });
 
 catalogArea.addEventListener("click", (event) => {
-  if (event.target.closest(".card-action-link")) return;
-
   const link = event.target.closest("[data-track-name]");
   if (!link) return;
-
-  const card = event.target.closest("[data-card-url]");
-  if (!card) return;
-  event.preventDefault();
   trackEvent("click", link.dataset.trackName);
-
-  const url = card.dataset.cardUrl;
-  if (!url || url === "#") return;
-  if (card.dataset.cardTarget === "_blank") {
-    window.open(url, "_blank", "noopener,noreferrer");
-  } else {
-    window.location.href = url;
-  }
-});
-
-catalogArea.addEventListener("keydown", (event) => {
-  if (event.target.closest(".card-action-link")) return;
-  if (event.key !== "Enter" && event.key !== " ") return;
-  const card = event.target.closest("[data-card-url]");
-  if (!card) return;
-  event.preventDefault();
-  card.click();
 });
 
 adminEntry.addEventListener("click", tryOpenAdmin);
