@@ -54,6 +54,7 @@ const searchInput = document.querySelector("#globalSearch");
 const assistantToggle = document.querySelector("#assistantToggle");
 const assistantClose = document.querySelector("#assistantClose");
 const assistantPanel = document.querySelector("#assistantPanel");
+const adminEntry = document.querySelector("#adminEntry");
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) => ({
@@ -309,6 +310,18 @@ function registerServiceWorker() {
   });
 }
 
+async function tryOpenAdmin() {
+  try {
+    const response = await fetch("/api/check-auth", { cache: "no-store" });
+    if (!response.ok) return;
+    const data = await response.json();
+    if (data.authenticated) {
+      window.location.href = "/admin";
+    }
+  } catch (err) {
+    // 未授权或网络异常时保持静默。
+  }
+}
 
 assistantToggle.addEventListener("click", () => {
   setAssistantOpen(!assistantPanel.classList.contains("open"));
@@ -323,6 +336,8 @@ catalogArea.addEventListener("click", (event) => {
   if (!link) return;
   trackEvent("click", link.dataset.trackName);
 });
+
+adminEntry.addEventListener("click", tryOpenAdmin);
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {

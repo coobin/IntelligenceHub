@@ -130,6 +130,19 @@ input {
   align-items: center;
   gap: 8px;
   font-size: 13px;
+  width: fit-content;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.sidebar-footer:focus-visible {
+  outline: 2px solid rgba(96, 165, 250, 0.75);
+  outline-offset: 4px;
+  border-radius: 6px;
 }
 
 .status-dot {
