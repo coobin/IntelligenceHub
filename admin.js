@@ -1,0 +1,487 @@
+let catalog = { sections: [] };
+let allEntryClicksExpanded = false;
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "\"": "&quot;",
+    "'": "&#39;"
+  }[char]));
+}
+
+function escapeAttribute(value) {
+  return escapeHtml(value).replace(/`/g, "&#96;");
+}
+
+function toNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
+}
+
+// 页面加载逻辑
+document.addEventListener("DOMContentLoaded", async () => {
+  const authRes = await fetch("/api/check-auth");
+  const { authenticated } = await authRes.json();
+  
+  if (authenticated) {
+    showAdmin();
+  } else {
+    showAccessDenied();
+  }
+});
+
+function showAccessDenied() {
+  document.getElementById("accessDeniedView").classList.remove("hidden");
+  document.getElementById("adminView").classList.add("hidden");
+}
+
+async function showAdmin() {
+  document.getElementById("accessDeniedView").classList.add("hidden");
+  document.getElementById("adminView").classList.remove("hidden");
+  await loadCatalog();
+  await loadStats();
+}
+
+// Tab 切换逻辑
+document.getElementById("tabDashboard").addEventListener("click", (e) => {
+  e.preventDefault();
+  document.getElementById("dashboardView").classList.remove("hidden");
+  document.getElementById("editorView").classList.add("hidden");
+  document.getElementById("tabDashboard").classList.add("active");
+  document.getElementById("tabEditor").classList.remove("active");
+  loadStats();
+});
+
+document.getElementById("tabEditor").addEventListener("click", (e) => {
+  e.preventDefault();
+  document.getElementById("dashboardView").classList.add("hidden");
+  document.getElementById("editorView").classList.remove("hidden");
+  document.getElementById("tabDashboard").classList.remove("active");
+  document.getElementById("tabEditor").classList.add("active");
+  renderAdmin(); // 确保渲染
+});
+
+document.getElementById("allEntryClicksToggle").addEventListener("click", () => {
+  allEntryClicksExpanded = !allEntryClicksExpanded;
+  const panel = document.getElementById("allEntryClicks");
+  const toggle = document.getElementById("allEntryClicksToggle");
+  panel.classList.toggle("hidden", !allEntryClicksExpanded);
+  toggle.setAttribute("aria-expanded", String(allEntryClicksExpanded));
+  toggle.innerText = allEntryClicksExpanded ? "收起" : "全部入口";
+});
+
+// 加载数据
+async function loadCatalog() {
+  const res = await fetch("/api/catalog", { cache: "no-store" });
+  catalog = await res.json();
+  renderAdmin();
+}
+
+// 保存数据
+async function saveCatalog() {
+  const res = await fetch("/api/catalog", {
+    method: "POST",
+    headers: { 
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(catalog)
+  });
+  if (res.ok) {
+    alert("保存成功");
+    renderAdmin();
+  } else {
+    alert("保存失败");
+  }
+}
+
+// 加载统计数据
+async function loadStats() {
+  const res = await fetch("/api/stats", { cache: "no-store" });
+  const stats = await res.json();
+  renderStats(stats);
+}
+
+function renderStats(stats) {
+  const today = new Date().toISOString().split("T")[0];
+  document.getElementById("totalPV").innerText = toNumber(stats.pageViews);
+  document.getElementById("todayPV").innerText = toNumber(stats.daily?.[today]);
+  
+  const todayUVList = stats.dailyUV?.[today] || [];
+  document.getElementById("todayUV").innerText = toNumber(todayUVList.length);
+  
+  const totalItems = catalog.sections.reduce((sum, s) => sum + s.items.length, 0);
+  document.getElementById("activeEntries").innerText = totalItems;
+
+  // 渲染排名
+  const rankList = document.getElementById("rankList");
+  const sortedClicks = Object.entries(stats.clicks || {})
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
+  
+  const maxClicks = toNumber(sortedClicks[0]?.[1]) || 1;
+  
+  rankList.innerHTML = sortedClicks.map(([name, count]) => `
+    <div class="rank-item">
+      <span style="width: 100px; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(name)}</span>
+      <div class="bar-outer">
+        <div class="bar-inner" style="width: ${(toNumber(count) / maxClicks) * 100}%"></div>
+      </div>
+      <span style="font-weight: 600; color: #1e293b;">${toNumber(count)}</span>
+    </div>
+  `).join("") || '<p style="color:#94a3b8; text-align:center; padding:20px;">暂无点击数据</p>';
+
+  renderAllEntryClicks(stats.clicks || {});
+
+  // 渲染趋势 (最近 7 天)
+  const trendList = document.getElementById("trendList");
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    days.push(d.toISOString().split("T")[0]);
+  }
+
+  const maxDaily = Math.max(...days.map(d => toNumber(stats.daily?.[d])), 1);
+
+  trendList.innerHTML = days.map(d => {
+    const val = toNumber(stats.daily?.[d]);
+    const height = (val / maxDaily) * 100;
+    const label = d.split("-").slice(1).join("/");
+    return `
+      <div style="flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%;">
+        <div style="flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center;">
+          <div style="width: 100%; max-width: 30px; height: ${height}%; background: var(--admin-accent); border-radius: 4px; position: relative;" title="${escapeAttribute(`${d}: ${val}`)}">
+            ${val > 0 ? `<span style="position: absolute; top: -20px; left: 50%; transform: translateX(-50%); font-size: 10px; color: #64748b;">${val}</span>` : ""}
+          </div>
+        </div>
+        <span style="font-size: 10px; color: #94a3b8; margin-top: 8px;">${label}</span>
+      </div>
+    `;
+  }).join("");
+
+  // 渲染最近访客
+  const recentList = document.getElementById("recentList");
+  recentList.innerHTML = `
+    <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+      <thead>
+        <tr style="text-align: left; color: #64748b; border-bottom: 1px solid #f1f5f9;">
+          <th style="padding: 12px 8px;">时间</th>
+          <th style="padding: 12px 8px;">用户名</th>
+          <th style="padding: 12px 8px;">IP 地址</th>
+          <th style="padding: 12px 8px;">设备信息</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${(stats.recent || []).map(r => `
+          <tr style="border-bottom: 1px solid #f8fafc;">
+            <td style="padding: 12px 8px; color: #1e293b;">${escapeHtml(r.time)}</td>
+            <td style="padding: 12px 8px;"><span style="font-weight: 600; color: var(--admin-accent);">${escapeHtml(r.user || "未知")}</span></td>
+            <td style="padding: 12px 8px;"><code style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px;">${escapeHtml(r.ip)}</code></td>
+            <td style="padding: 12px 8px; color: #64748b; font-size: 12px;">${parseUA(r.ua)}</td>
+          </tr>
+        `).join("") || '<tr><td colspan="4" style="text-align:center; padding:20px; color:#94a3b8;">暂无记录</td></tr>'}
+      </tbody>
+    </table>
+  `;
+}
+
+function getCatalogEntries() {
+  return catalog.sections.flatMap((section) => (
+    (section.items || []).map((item) => ({
+      name: item.name || "未命名入口",
+      section: section.title || section.id || "未分类",
+      type: item.type || "-",
+      clicks: 0
+    }))
+  ));
+}
+
+function renderAllEntryClicks(clicks) {
+  const allEntryClicks = document.getElementById("allEntryClicks");
+  if (!allEntryClicks) return;
+  allEntryClicks.classList.toggle("hidden", !allEntryClicksExpanded);
+
+  const entryMap = new Map();
+  getCatalogEntries().forEach((entry) => {
+    const existing = entryMap.get(entry.name);
+    if (existing) {
+      existing.section = `${existing.section} / ${entry.section}`;
+      return;
+    }
+    entryMap.set(entry.name, entry);
+  });
+
+  Object.entries(clicks || {}).forEach(([name, count]) => {
+    const current = entryMap.get(name);
+    if (current) {
+      current.clicks = toNumber(count);
+      return;
+    }
+    entryMap.set(name, {
+      name,
+      section: "未在当前目录中",
+      type: "-",
+      clicks: toNumber(count)
+    });
+  });
+
+  const rows = Array.from(entryMap.values())
+    .sort((a, b) => b.clicks - a.clicks || a.name.localeCompare(b.name, "zh-Hans-CN"));
+  const zeroCount = rows.filter((entry) => entry.clicks === 0).length;
+
+  allEntryClicks.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:10px; color:#64748b; font-size:12px;">
+      <span>共 ${rows.length} 个入口</span>
+      <span>${zeroCount} 个暂无点击</span>
+    </div>
+    <table class="entry-click-table">
+      <thead>
+        <tr>
+          <th>入口名称</th>
+          <th>所属分类</th>
+          <th>类型</th>
+          <th style="text-align:right;">点击次数</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map((entry) => `
+          <tr>
+            <td class="entry-click-name">${escapeHtml(entry.name)}</td>
+            <td>${escapeHtml(entry.section)}</td>
+            <td><span class="type-pill type-${escapeAttribute(entry.type)}" style="font-size:11px;">${escapeHtml(entry.type)}</span></td>
+            <td class="entry-click-count">${toNumber(entry.clicks)}</td>
+          </tr>
+        `).join("") || '<tr><td colspan="4" style="text-align:center; padding:20px; color:#94a3b8;">暂无入口数据</td></tr>'}
+      </tbody>
+    </table>
+  `;
+}
+
+function parseUA(ua) {
+  if (!ua) return "未知";
+  if (ua.includes("MicroMessenger")) return "微信内置浏览器";
+  if (ua.includes("Mobile")) return "移动设备";
+  if (ua.includes("Windows")) return "Windows PC";
+  if (ua.includes("Macintosh")) return "Mac PC";
+  return "其他设备";
+}
+
+// 渲染管理界面
+function renderAdmin() {
+  const list = document.getElementById("sectionsList");
+  list.innerHTML = catalog.sections.map((section, sIndex) => `
+    <div class="section-editor">
+      <div class="section-header">
+        <div>
+          <h2 style="margin:0">${escapeHtml(section.title)} <small style="color:#94a3b8; font-weight:normal; font-size:14px;">(${escapeHtml(section.id)})</small></h2>
+          <p style="margin:4px 0 0; color:#64748b; font-size:13px;">${escapeHtml(section.description || "无描述")}</p>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-ghost" data-action="edit-section" data-section-index="${sIndex}">编辑分类</button>
+          <button class="btn btn-danger" data-action="delete-section" data-section-index="${sIndex}">删除分类</button>
+          <button class="btn btn-primary" data-action="add-item" data-section-id="${escapeAttribute(section.id)}">+ 添加项目</button>
+        </div>
+      </div>
+      <div class="items-list">
+        <div class="item-row" style="font-weight:600; color:#94a3b8; font-size:12px; border-bottom:1px solid #e2e8f0; padding-bottom:8px;">
+          <div>名称</div>
+          <div>描述 / URL</div>
+          <div>类型</div>
+          <div>状态</div>
+          <div>操作</div>
+        </div>
+        ${section.items.map((item, iIndex) => `
+          <div class="item-row">
+            <div style="font-weight:600">${escapeHtml(item.name)}</div>
+            <div style="font-size:13px; color:#64748b;">
+              <div>${escapeHtml(item.description || "-")}</div>
+              <div style="color:#94a3b8; font-family:monospace; font-size:11px;">${escapeHtml(item.url)}</div>
+            </div>
+            <div><span class="type-pill type-${escapeAttribute(item.type)}" style="font-size:11px;">${escapeHtml(item.type)}</span></div>
+            <div style="font-size:12px;">${escapeHtml(item.status || "-")}</div>
+            <div style="display:flex; gap:4px;">
+              <button class="btn btn-ghost" style="padding:4px 8px;" data-action="edit-item" data-section-id="${escapeAttribute(section.id)}" data-item-index="${iIndex}">编辑</button>
+              <button class="btn btn-danger" style="padding:4px 8px;" data-action="delete-item" data-section-id="${escapeAttribute(section.id)}" data-item-index="${iIndex}">删除</button>
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  `).join("");
+}
+
+document.getElementById("sectionsList").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-action]");
+  if (!button) return;
+
+  const sectionIndex = Number(button.dataset.sectionIndex);
+  const itemIndex = Number(button.dataset.itemIndex);
+
+  switch (button.dataset.action) {
+    case "edit-section":
+      editSection(sectionIndex);
+      break;
+    case "delete-section":
+      deleteSection(sectionIndex);
+      break;
+    case "add-item":
+      addItem(button.dataset.sectionId);
+      break;
+    case "edit-item":
+      editItem(button.dataset.sectionId, itemIndex);
+      break;
+    case "delete-item":
+      deleteItem(button.dataset.sectionId, itemIndex);
+      break;
+  }
+});
+
+// --- Item 操作 ---
+function addItem(sectionId) {
+  document.getElementById("modalTitle").innerText = "添加项目";
+  document.getElementById("itemForm").reset();
+  document.getElementById("editSectionId").value = sectionId;
+  document.getElementById("editItemIndex").value = "";
+  document.getElementById("itemModal").style.display = "grid";
+}
+
+function editItem(sectionId, index) {
+  const section = catalog.sections.find(s => s.id === sectionId);
+  const item = section.items[index];
+  
+  document.getElementById("modalTitle").innerText = "编辑项目";
+  document.getElementById("editSectionId").value = sectionId;
+  document.getElementById("editItemIndex").value = index;
+  document.getElementById("itemName").value = item.name;
+  document.getElementById("itemDesc").value = item.description || "";
+  document.getElementById("itemUrl").value = item.url;
+  document.getElementById("itemType").value = item.type;
+  document.getElementById("itemTags").value = (item.tags || []).join(", ");
+  document.getElementById("itemStatus").value = item.status || "";
+  document.getElementById("itemIcon").value = item.icon || "";
+  
+  document.getElementById("itemModal").style.display = "grid";
+}
+
+function deleteItem(sectionId, index) {
+  if (!confirm("确定要删除此项目吗？")) return;
+  const section = catalog.sections.find(s => s.id === sectionId);
+  section.items.splice(index, 1);
+  saveCatalog();
+}
+
+document.getElementById("itemForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const sectionId = document.getElementById("editSectionId").value;
+  const index = document.getElementById("editItemIndex").value;
+  const section = catalog.sections.find(s => s.id === sectionId);
+  const existingItem = index === "" ? {} : (section.items[index] || {});
+  
+  const item = {
+    ...existingItem,
+    name: document.getElementById("itemName").value,
+    description: document.getElementById("itemDesc").value,
+    url: document.getElementById("itemUrl").value,
+    type: document.getElementById("itemType").value,
+    tags: document.getElementById("itemTags").value.split(",").map(t => t.trim()).filter(t => t),
+    status: document.getElementById("itemStatus").value,
+    icon: document.getElementById("itemIcon").value
+  };
+  
+  if (index === "") {
+    section.items.push(item);
+  } else {
+    section.items[index] = item;
+  }
+  
+  saveCatalog();
+  closeModal();
+});
+
+function closeModal() {
+  document.getElementById("itemModal").style.display = "none";
+}
+
+async function uploadIcon(input) {
+  if (!input.files || !input.files[0]) return;
+  
+  const formData = new FormData();
+  formData.append("icon", input.files[0]);
+  
+  const btn = input.previousElementSibling;
+  const originalText = btn.innerText;
+  btn.innerText = "上传中...";
+  btn.disabled = true;
+
+  try {
+    const res = await fetch("/api/upload-icon", {
+      method: "POST",
+      body: formData
+    });
+    const data = await res.json();
+    if (data.success) {
+      document.getElementById("itemIcon").value = data.filepath;
+      btn.innerText = "上传成功";
+      setTimeout(() => btn.innerText = "更换图片", 2000);
+    } else {
+      alert("上传失败: " + (data.message || "未知错误"));
+      btn.innerText = "上传失败";
+    }
+  } catch (err) {
+    alert("上传错误");
+    btn.innerText = "上传错误";
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// --- Section 操作 ---
+function addSection() {
+  document.getElementById("sectionModalTitle").innerText = "添加分类";
+  document.getElementById("sectionForm").reset();
+  document.getElementById("editSectionIdReal").value = "";
+  document.getElementById("sectionModal").style.display = "grid";
+}
+
+function editSection(index) {
+  const section = catalog.sections[index];
+  document.getElementById("sectionModalTitle").innerText = "编辑分类";
+  document.getElementById("editSectionIdReal").value = index;
+  document.getElementById("sectionId").value = section.id;
+  document.getElementById("sectionTitle").value = section.title;
+  document.getElementById("sectionDesc").value = section.description || "";
+  document.getElementById("sectionModal").style.display = "grid";
+}
+
+function deleteSection(index) {
+  if (!confirm("确定要删除此分类及其下的所有项目吗？")) return;
+  catalog.sections.splice(index, 1);
+  saveCatalog();
+}
+
+document.getElementById("sectionForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const index = document.getElementById("editSectionIdReal").value;
+  
+  const section = {
+    id: document.getElementById("sectionId").value,
+    title: document.getElementById("sectionTitle").value,
+    description: document.getElementById("sectionDesc").value,
+    items: index === "" ? [] : catalog.sections[index].items
+  };
+  
+  if (index === "") {
+    catalog.sections.push(section);
+  } else {
+    catalog.sections[index] = section;
+  }
+  
+  saveCatalog();
+  closeSectionModal();
+});
+
+function closeSectionModal() {
+  document.getElementById("sectionModal").style.display = "none";
+}

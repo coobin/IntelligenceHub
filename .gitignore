@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Local config and secrets
+.env
+.env.*
+!.env.example
+config.local.js
+
+# Internal docs (not for the public repo)
+CLAUDE.md
+
+# Claude Code local settings
+.claude/
+
+# Runtime data (auto-generated / instance-specific)
+data/stats.json
+data/icons/*
+!data/icons/.gitkeep
+
+# Build output
+dist/
+build/
+.cache/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp

@@ -1,0 +1,26 @@
+version: '3.8'
+services:
+  intelligence-hub:
+    build: .
+    container_name: intelligence-hub
+    ports:
+      - "8080:80"
+    environment:
+      - TZ=Asia/Shanghai
+      - ADMIN_REMOTE_USER=${ADMIN_REMOTE_USER:-admin}
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./app.js:/app/app.js
+      - ./styles.css:/app/styles.css
+      - ./index.html:/app/index.html
+      - ./admin.html:/app/admin.html
+      - ./admin.js:/app/admin.js
+      - ./server.js:/app/server.js
+      - ./sw.js:/app/sw.js
+      - ./config.js:/app/config.js
+      - ./config.local.js:/app/config.local.js
+      - ./manifest.webmanifest:/app/manifest.webmanifest
+      - ./assets/icons:/app/assets/icons
+    restart: always

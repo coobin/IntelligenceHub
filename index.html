@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Intelligence Hub - 企业内部系统、工具、网址与智能问答入口。" />
+    <meta name="theme-color" content="#0f1f3a" />
+    <meta name="application-name" content="Intelligence Hub" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Intelligence Hub" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>Intelligence Hub</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./assets/icons/icon-192.png" type="image/png" />
+    <link rel="apple-touch-icon" href="./assets/icons/apple-touch-icon.png" />
+    <link rel="stylesheet" href="./styles.css?v=20260618_01" />
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/marked@12.0.0/marked.min.js"></script>
+    <script src="https://unpkg.com/dompurify@3.0.9/dist/purify.min.js"></script>
+    <script type="module" src="./app.js?v=20260618_01"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="主导航">
+        <div class="brand-block">
+          <span class="brand-mark" aria-hidden="true">
+            <img src="./assets/icons/icon-192.png" alt="" />
+          </span>
+          <div>
+            <div class="brand-name">Intelligence Hub</div>
+            <div class="brand-subtitle">Intelligence Hub</div>
+          </div>
+        </div>
+        <nav class="section-nav" id="sectionNav"></nav>
+        <div class="daily-photo-display">
+          <img src="" alt="今日照片" loading="lazy" />
+        </div>
+        <button class="sidebar-footer" id="adminEntry" type="button" aria-label="进入后台">
+          <span class="status-dot"></span>
+          <span>内部工作台</span>
+        </button>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Enterprise Navigation</p>
+            <h1>Intelligence Hub</h1>
+          </div>
+          <form class="search-bar" action="https://www.bing.com/search" method="GET" target="_blank">
+            <input name="q" id="globalSearch" type="search" placeholder="在 Bing 中搜索..." autocomplete="off" />
+            <button type="submit" aria-label="搜索">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            </button>
+          </form>
+        </header>
+
+        <section class="catalog-area" id="catalogArea" aria-live="polite"></section>
+      </main>
+    </div>
+
+    <section class="assistant-widget" aria-label="智能问答">
+      <button class="assistant-fab" id="assistantToggle" type="button" aria-expanded="false" aria-controls="assistantPanel" aria-label="打开 AI 助手">
+        <span class="assistant-fab-mark" aria-hidden="true">AI 助手</span>
+      </button>
+      <aside class="assistant-panel" id="assistantPanel" aria-hidden="true">
+        <input type="file" id="nativeInvoiceUpload" accept="image/*,application/pdf" multiple style="display:none" />
+        
+        <button class="assistant-close floating-close" id="assistantClose" type="button" aria-label="关闭问答">×</button>
+        <div class="assistant-chat-container">
+          <div class="assistant-messages" id="assistantMessages">
+            <div class="assistant-message assistant-message-system">
+              <div class="assistant-message-content">
+                你好！我是 AI 助手，有什么我可以帮您的吗？
+              </div>
+            </div>
+          </div>
+          <div class="assistant-input-area">
+            <!-- Attachment preview pool -->
+            <div class="assistant-attachment-pool" id="assistantAttachmentPool" style="display:none;"></div>
+            
+            <div class="assistant-input-wrapper">
+              <button class="native-upload-btn" id="nativeUploadBtn" type="button" aria-label="通讯费报销">
+                通讯费报销
+              </button>
+              <textarea id="assistantInput" placeholder="输入你想问的问题..." rows="1"></textarea>
+              <input id="difyAttachmentInput" type="file" accept="image/*,application/pdf" multiple style="display:none;" />
+              <button id="difyAttachmentBtn" class="assistant-mic-btn" type="button" aria-label="上传发票附件">
+                <i data-lucide="paperclip"></i>
+              </button>
+              <button id="assistantMicBtn" class="assistant-mic-btn" type="button" aria-label="语音输入">
+                <i data-lucide="mic"></i>
+              </button>
+              <button id="assistantSendBtn" aria-label="发送">
+                <i data-lucide="send"></i>
+              </button>
+            </div>
+            <div class="assistant-footer">POWERED BY Intelligence Hub</div>
+          </div>
+        </div>
+      </aside>
+    </section>
+    <section class="photo-viewer" id="photoViewer" aria-hidden="true">
+      <div class="photo-viewer-overlay" id="photoViewerOverlay"></div>
+      <div class="photo-viewer-content">
+        <img src="" alt="今日照片全屏" id="photoViewerImg" />
+        <button class="photo-viewer-close" id="photoViewerClose" type="button" aria-label="关闭预览">×</button>
+      </div>
+    </section>
+
+    <!-- Invoice Result Modal -->
+    <div class="invoice-modal-overlay" id="invoiceResultModal" aria-hidden="true">
+      <div class="invoice-modal-content">
+        <div class="invoice-modal-header">
+          <h3 id="invoiceModalTitle">发票识别结果</h3>
+          <button class="invoice-modal-close" id="invoiceModalClose">&times;</button>
+        </div>
+        <div class="invoice-modal-body" id="invoiceModalBody">
+          <!-- Dynamically filled -->
+        </div>
+        <div class="invoice-modal-footer" id="invoiceModalFooter">
+          <!-- Dynamically filled -->
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,12 @@
+Windows Registry Editor Version 5.00
+
+[HKEY_CLASSES_ROOT\k3cloud]
+@="URL:Kingdee K3Cloud Protocol"
+"URL Protocol"=""
+
+[HKEY_CLASSES_ROOT\k3cloud\shell]
+
+[HKEY_CLASSES_ROOT\k3cloud\shell\open]
+
+[HKEY_CLASSES_ROOT\k3cloud\shell\open\command]
+@="\"C:\\Program Files (x86)\\Kingdee\\K3Cloud\\DeskClient\\Kingdee.BOS.DeskClient.Shell.exe\" \"%1\""

@@ -1,0 +1,121 @@
+openapi: 3.1.0
+info:
+  title: 发票报销合规校验系统
+  description: 提供给 Dify 的内部发票工具。支持把用户在对话里发送的发票文件传给后端 OCR 识别与合规校验，并在对话里确认提交报销。
+  version: 1.1.0
+# 注意：Dify 是服务端发起调用。若后端在 SSO/反代之后，server 需填后端可直连的内网地址，
+# 否则走公网域名可能被认证网关拦成登录页。user_id 通过参数传，无需身份头。
+# 部署时把下面的 url 改成你自己的发票后端地址。
+servers:
+  - url: http://INVOICE_HOST:8082/api/invoices
+paths:
+  /dify/submit:
+    post:
+      summary: 提交发票文件进行校验
+      description: 接收一个发票文件（图片或PDF），进行识别和合规性校验，返回识别结果、回执文本与待确认的发票 ID。
+      operationId: submitInvoice
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: 待校验的发票文件内容
+                file_url:
+                  type: string
+                  description: 发票文件的可下载链接（与 file 二选一，用于传 Dify 已上传文件的 URL）
+                user_id:
+                  type: string
+                  description: 当前用户的 ID（域账号或中文名），用于绑定报销单归属
+      responses:
+        "200":
+          description: 校验结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  invoice:
+                    type: object
+                    description: 发票详细信息（含 id、金额、号码、账期等）
+                  message:
+                    type: string
+                    description: 给用户看的回执文本（含识别要点与下一步引导）
+                  decision_required:
+                    type: boolean
+                    description: 是否需要用户进一步确认
+                  recommended_action:
+                    type: string
+                    description: 系统推荐的后续动作（confirm 或 reject）
+  /dify/confirm-latest:
+    post:
+      summary: 确认提交报销（本人最近一张）
+      description: 用户在对话里回复「确认」后调用：确认该用户最近一张待确认发票，无需传 invoice_id。
+      operationId: confirmLatestInvoice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - user_id
+              properties:
+                user_id:
+                  type: string
+                  description: 当前用户的 ID（域账号或中文名）
+      responses:
+        "200":
+          description: 确认结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    description: ok 或 error
+                  message:
+                    type: string
+                    description: 给用户看的回执文本（直接原样输出）
+                  invoice_id:
+                    type: integer
+                    description: 对应的发票 ID
+  /dify/confirm:
+    post:
+      summary: 确认提交报销（按 ID）
+      description: 根据上一步识别得到的发票 ID 把该发票提交进报销池。
+      operationId: confirmInvoice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - invoice_id
+              properties:
+                invoice_id:
+                  type: integer
+                  description: 上一步 submitInvoice 返回的 invoice.id（待确认发票的 ID）
+      responses:
+        "200":
+          description: 确认结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    description: ok 或 error
+                  message:
+                    type: string
+                    description: 给用户看的回执文本（直接原样输出）
+                  invoice_id:
+                    type: integer
+                    description: 对应的发票 ID

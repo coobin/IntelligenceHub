@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>后台管理 | Intelligence Hub</title>
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      :root {
+        --admin-bg: #f8fafc;
+        --admin-sidebar: #1e293b;
+        --admin-accent: #3b82f6;
+      }
+      
+      body.admin-body {
+        background: var(--admin-bg);
+        margin: 0;
+        font-family: Inter, system-ui, sans-serif;
+      }
+
+      .access-denied {
+        display: grid;
+        place-items: center;
+        min-height: 100vh;
+      }
+
+      .access-card {
+        background: white;
+        padding: 40px;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+        width: 100%;
+        max-width: 400px;
+        text-align: center;
+      }
+
+      .access-card h1 {
+        margin-bottom: 12px;
+        font-size: 24px;
+      }
+
+      .access-card p {
+        color: #64748b;
+        line-height: 1.6;
+        margin-bottom: 24px;
+      }
+
+      .form-group {
+        margin-bottom: 16px;
+      }
+
+      .form-group input {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        outline: none;
+      }
+
+      .form-group input:focus {
+        border-color: var(--admin-accent);
+      }
+
+      .access-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 12px;
+        background: var(--admin-accent);
+        color: white;
+        border: 0;
+        border-radius: 8px;
+        font-weight: 600;
+        text-decoration: none;
+      }
+
+      .admin-layout {
+        display: grid;
+        grid-template-columns: 260px 1fr;
+        min-height: 100vh;
+      }
+
+      .admin-sidebar {
+        background: var(--admin-sidebar);
+        color: white;
+        padding: 24px;
+      }
+
+      .admin-main {
+        padding: 40px;
+        max-width: 1200px;
+        margin: 0 auto;
+        width: 100%;
+      }
+
+      .section-editor {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        margin-bottom: 32px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+      }
+
+      .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        border-bottom: 1px solid #f1f5f9;
+        padding-bottom: 12px;
+      }
+
+      .item-row {
+        display: grid;
+        grid-template-columns: 2fr 3fr 2fr 1fr auto;
+        gap: 16px;
+        align-items: center;
+        padding: 12px 0;
+        border-bottom: 1px solid #f8fafc;
+      }
+
+      .item-row:last-child {
+        border-bottom: 0;
+      }
+
+      .btn {
+        padding: 8px 16px;
+        border-radius: 6px;
+        font-size: 13px;
+        cursor: pointer;
+        border: 0;
+        font-weight: 500;
+      }
+
+      .btn-primary { background: var(--admin-accent); color: white; }
+      .btn-danger { background: #ef4444; color: white; }
+      .btn-ghost { background: #f1f5f9; color: #475569; }
+
+      .modal {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.5);
+        display: none;
+        place-items: center;
+        z-index: 1000;
+      }
+
+      .modal-content {
+        background: white;
+        padding: 32px;
+        border-radius: 12px;
+        width: 100%;
+        max-width: 600px;
+      }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 24px;
+        margin-bottom: 40px;
+      }
+
+      .stats-card {
+        background: white;
+        padding: 24px;
+        border-radius: 16px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+        border: 1px solid #f1f5f9;
+      }
+
+      .stats-card h3 {
+        margin: 0 0 8px 0;
+        font-size: 14px;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .stats-card .value {
+        font-size: 32px;
+        font-weight: 700;
+        color: #1e293b;
+      }
+
+      .chart-container {
+        background: white;
+        padding: 24px;
+        border-radius: 16px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+        margin-bottom: 32px;
+      }
+
+      .rank-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 0;
+        border-bottom: 1px solid #f8fafc;
+      }
+
+      .rank-item:last-child { border-bottom: 0; }
+
+      .chart-title-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 24px;
+      }
+
+      .chart-title-row h3 {
+        margin: 0;
+        font-size: 16px;
+        color: #1e293b;
+      }
+
+      .compact-toggle {
+        border: 0;
+        border-radius: 999px;
+        background: #eff6ff;
+        color: var(--admin-accent);
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 700;
+        padding: 6px 10px;
+        white-space: nowrap;
+      }
+
+      .compact-toggle:hover {
+        background: #dbeafe;
+      }
+
+      .entry-click-panel {
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px solid #f1f5f9;
+        max-height: 360px;
+        overflow: auto;
+      }
+
+      .entry-click-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+      }
+
+      .entry-click-table th {
+        padding: 12px 8px;
+        color: #64748b;
+        font-size: 12px;
+        font-weight: 600;
+        text-align: left;
+        border-bottom: 1px solid #f1f5f9;
+      }
+
+      .entry-click-table td {
+        padding: 12px 8px;
+        color: #1e293b;
+        border-bottom: 1px solid #f8fafc;
+      }
+
+      .entry-click-table tbody tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .entry-click-name {
+        font-weight: 600;
+      }
+
+      .entry-click-count {
+        font-weight: 700;
+        color: var(--admin-accent);
+        text-align: right;
+      }
+
+      .bar-outer {
+        flex: 1;
+        height: 8px;
+        background: #f1f5f9;
+        border-radius: 4px;
+        margin: 0 16px;
+        overflow: hidden;
+      }
+
+      .bar-inner {
+        height: 100%;
+        background: var(--admin-accent);
+        border-radius: 4px;
+      }
+
+      .nav-link {
+        color: #94a3b8;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        border-radius: 8px;
+        margin-bottom: 4px;
+        transition: all 0.2s;
+      }
+
+      .nav-link:hover {
+        background: rgba(255,255,255,0.05);
+        color: white;
+      }
+
+      .nav-link.active {
+        background: var(--admin-accent);
+        color: white;
+      }
+
+      .hidden { display: none !important; }
+    </style>
+  </head>
+  <body class="admin-body">
+    <!-- 无权限界面 -->
+    <div id="accessDeniedView" class="access-denied hidden">
+      <div class="access-card">
+        <h1>无法访问后台</h1>
+        <p>当前账号没有后台管理权限。如需访问，请先通过统一身份认证授权。</p>
+        <a class="access-link" href="/">返回首页</a>
+      </div>
+    </div>
+
+    <!-- 管理界面 -->
+    <div id="adminView" class="admin-layout hidden">
+      <aside class="admin-sidebar">
+        <h2>CIH 后台</h2>
+        <nav style="margin-top: 40px;">
+          <div style="margin-bottom: 20px; color: #94a3b8; font-size: 11px; text-transform: uppercase; padding: 0 16px;">管理菜单</div>
+          <a href="#" class="nav-link active" id="tabDashboard">
+            <span>数据仪表盘</span>
+          </a>
+          <a href="#" class="nav-link" id="tabEditor">
+            <span>导航目录编辑</span>
+          </a>
+          <div style="margin-top: 40px; margin-bottom: 20px; color: #94a3b8; font-size: 11px; text-transform: uppercase; padding: 0 16px;">系统控制</div>
+          <a href="/" class="nav-link">
+            <span>返回首页</span>
+          </a>
+        </nav>
+      </aside>
+      
+      <main class="admin-main">
+        <!-- Dashboard View -->
+        <div id="dashboardView">
+          <header style="margin-bottom: 40px;">
+            <h1 style="font-size: 28px; margin-bottom: 8px;">数据概览</h1>
+            <p style="color: #64748b;">实时监测 Intelligence Hub 的使用情况</p>
+          </header>
+
+          <div class="stats-grid">
+            <div class="stats-card">
+              <h3>总访问次数 (PV)</h3>
+              <div class="value" id="totalPV">0</div>
+            </div>
+            <div class="stats-card">
+              <h3>今日访问</h3>
+              <div class="value" id="todayPV">0</div>
+            </div>
+            <div class="stats-card">
+              <h3>今日访客 (UV)</h3>
+              <div class="value" id="todayUV">0</div>
+            </div>
+            <div class="stats-card">
+              <h3>活跃入口数</h3>
+              <div class="value" id="activeEntries">0</div>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 32px;">
+            <div class="chart-container">
+              <div class="chart-title-row">
+                <h3>热门入口排行</h3>
+                <button class="compact-toggle" id="allEntryClicksToggle" type="button" aria-expanded="false">全部入口</button>
+              </div>
+              <div id="rankList">
+                <!-- 动态加载 -->
+              </div>
+              <div id="allEntryClicks" class="entry-click-panel hidden">
+                <!-- 动态加载列表 -->
+              </div>
+            </div>
+            <div class="chart-container">
+              <h3 style="margin-bottom: 24px; font-size: 16px; color: #1e293b;">最近 7 日趋势</h3>
+              <div id="trendList" style="display: flex; align-items: flex-end; height: 200px; gap: 12px; padding-top: 20px;">
+                <!-- 动态加载柱状图 -->
+              </div>
+            </div>
+          </div>
+
+          <div class="chart-container">
+            <h3 style="margin-bottom: 24px; font-size: 16px; color: #1e293b;">最近访客记录</h3>
+            <div id="recentList">
+              <!-- 动态加载列表 -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Editor View -->
+        <div id="editorView" class="hidden">
+          <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px;">
+            <h1>导航目录编辑</h1>
+            <button class="btn btn-primary" onclick="addSection()">+ 添加分类</button>
+          </header>
+
+          <div id="sectionsList">
+            <!-- 动态加载内容 -->
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- 编辑 Item 模态框 -->
+    <div id="itemModal" class="modal">
+      <div class="modal-content">
+        <h2 id="modalTitle">编辑项目</h2>
+        <form id="itemForm" style="display: grid; gap: 16px; margin-top: 20px;">
+          <input type="hidden" id="editSectionId" />
+          <input type="hidden" id="editItemIndex" />
+          <div class="form-group">
+            <label>名称</label>
+            <input type="text" id="itemName" required />
+          </div>
+          <div class="form-group">
+            <label>描述</label>
+            <input type="text" id="itemDesc" />
+          </div>
+          <div class="form-group">
+            <label>URL</label>
+            <input type="text" id="itemUrl" required />
+          </div>
+          <div class="form-group">
+            <label>类型</label>
+            <select id="itemType" style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px;">
+              <option value="h5">H5</option>
+              <option value="client">客户端</option>
+              <option value="tool">工具</option>
+              <option value="website">网址</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>标签 (逗号分隔)</label>
+            <input type="text" id="itemTags" />
+          </div>
+          <div class="form-group">
+            <label>状态</label>
+            <input type="text" id="itemStatus" />
+          </div>
+          <div class="form-group">
+            <label>图标名称 (Lucide 名称 或 上传图片)</label>
+            <div style="display: flex; gap: 8px;">
+              <input type="text" id="itemIcon" placeholder="如: mail, cloud" style="flex: 1;" />
+              <button type="button" class="btn btn-ghost" onclick="document.getElementById('iconFile').click()">上传图片</button>
+              <input type="file" id="iconFile" style="display: none;" accept="image/*" onchange="uploadIcon(this)" />
+            </div>
+            <small style="display: block; margin-top: 4px; color: #64748b;">
+              内置图标库：<a href="https://lucide.dev/icons/" target="_blank" style="color: var(--admin-accent); text-decoration: none;">Lucide Icons (点击查找名称)</a>
+            </small>
+          </div>
+          <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 10px;">
+            <button type="button" class="btn btn-ghost" onclick="closeModal()">取消</button>
+            <button type="submit" class="btn btn-primary">保存</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 编辑 Section 模态框 -->
+    <div id="sectionModal" class="modal">
+      <div class="modal-content">
+        <h2 id="sectionModalTitle">编辑分类</h2>
+        <form id="sectionForm" style="display: grid; gap: 16px; margin-top: 20px;">
+          <input type="hidden" id="editSectionIdReal" />
+          <div class="form-group">
+            <label>分类 ID (唯一标识)</label>
+            <input type="text" id="sectionId" required />
+          </div>
+          <div class="form-group">
+            <label>标题</label>
+            <input type="text" id="sectionTitle" required />
+          </div>
+          <div class="form-group">
+            <label>描述</label>
+            <input type="text" id="sectionDesc" />
+          </div>
+          <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 10px;">
+            <button type="button" class="btn btn-ghost" onclick="closeSectionModal()">取消</button>
+            <button type="submit" class="btn btn-primary">保存</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script src="admin.js?v=20260528_1818"></script>
+  </body>
+</html>

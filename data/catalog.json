@@ -1,0 +1,132 @@
+{
+  "sections": [
+    {
+      "id": "systems",
+      "title": "内部系统",
+      "description": "",
+      "items": [
+        {
+          "name": "企业邮箱",
+          "description": "企业邮箱登录入口（示例）。",
+          "url": "https://mail.example.com",
+          "type": "h5",
+          "tags": ["邮箱", "办公"],
+          "status": "内部系统",
+          "icon": "mail"
+        },
+        {
+          "name": "企业云盘",
+          "description": "企业文件存储、同步和共享（示例）。",
+          "url": "https://cloud.example.com",
+          "type": "h5",
+          "tags": ["文件", "协作"],
+          "status": "内部系统",
+          "icon": "hard-drive"
+        },
+        {
+          "name": "ERP 系统",
+          "description": "财务、供应链和企业经营管理系统（示例）。",
+          "url": "https://erp.example.com",
+          "type": "h5",
+          "tags": ["财务", "ERP"],
+          "status": "内部系统",
+          "icon": "chart-no-axes-combined"
+        },
+        {
+          "name": "HR 系统",
+          "description": "人事管理、薪酬和组织信息入口（示例）。",
+          "url": "https://hr.example.com",
+          "type": "h5",
+          "tags": ["HR", "薪酬"],
+          "status": "内部系统",
+          "icon": "users"
+        }
+      ]
+    },
+    {
+      "id": "clients",
+      "title": "本地客户端",
+      "description": "",
+      "items": [
+        {
+          "name": "微信",
+          "description": "打开个人微信客户端。",
+          "url": "weixin://",
+          "type": "client",
+          "tags": ["IM", "客户端"],
+          "status": "需本机安装",
+          "icon": "message-circle"
+        },
+        {
+          "name": "ERP 客户端(仅支持 Windows)",
+          "description": "通过自定义协议唤起本地客户端（示例）。",
+          "url": "myapp://launch",
+          "type": "client",
+          "tags": ["客户端"],
+          "status": "Windows 客户端",
+          "icon": "monitor-up",
+          "actions": [
+            {
+              "label": "下载启动支持",
+              "url": "./downloads/k3cloud-protocol.reg",
+              "icon": "download",
+              "download": true,
+              "note": "首次使用需下载并双击运行，完成注册表导入后即可打开客户端。",
+              "trackName": "客户端启动支持"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tools",
+      "title": "工具箱",
+      "description": "",
+      "items": [
+        {
+          "name": "PDF 全能转换器",
+          "description": "PDF 合并、拆分、压缩、转换与处理（示例）。",
+          "url": "https://pdf.example.com",
+          "type": "tool",
+          "tags": ["PDF", "转换"],
+          "status": "内部工具",
+          "icon": "file-type-2"
+        },
+        {
+          "name": "流程图制作",
+          "description": "流程图、架构图、网络拓扑图绘制（示例）。",
+          "url": "https://drawio.example.com",
+          "type": "tool",
+          "tags": ["绘图", "流程图"],
+          "status": "内部工具",
+          "icon": "workflow"
+        }
+      ]
+    },
+    {
+      "id": "websites",
+      "title": "在线 AI",
+      "description": "",
+      "items": [
+        {
+          "name": "豆包",
+          "description": "字节跳动出品的 AI 智能助手。",
+          "url": "https://www.doubao.com",
+          "type": "website",
+          "tags": ["AI", "助手"],
+          "status": "外部站点",
+          "icon": "bot"
+        },
+        {
+          "name": "DeepSeek",
+          "description": "强大的国产大语言模型平台。",
+          "url": "https://chat.deepseek.com",
+          "type": "website",
+          "tags": ["AI", "大模型"],
+          "status": "外部站点",
+          "icon": "brain-circuit"
+        }
+      ]
+    }
+  ]
+}
