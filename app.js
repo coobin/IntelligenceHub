@@ -573,8 +573,7 @@ function renderAssistant() {
       const reader = response.body.getReader();
       const decoder = new TextDecoder("utf-8");
       let fullReply = "";
-      replyContentDiv.innerHTML = '<i data-lucide="loader"></i>思考中...';
-      if (window.lucide) window.lucide.createIcons();
+      replyContentDiv.innerHTML = '<span class="assistant-typing" aria-label="思考中"><span class="assistant-typing-dot"></span><span class="assistant-typing-dot"></span><span class="assistant-typing-dot"></span></span>';
       
       let buffer = "";
       while (true) {
