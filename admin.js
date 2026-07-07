@@ -184,12 +184,12 @@ function drawRecentVisitors() {
   const recentList = document.getElementById("recentList");
   if (!recentList) return;
 
-  const visible = recentVisitorsExpanded ? cachedRecentVisitors : cachedRecentVisitors.slice(0, 5);
+  const visible = recentVisitorsExpanded ? cachedRecentVisitors : cachedRecentVisitors.slice(0, 6);
   const toggle = document.getElementById("recentVisitorsToggle");
   if (toggle) {
     toggle.textContent = recentVisitorsExpanded ? "收起" : "展开更多";
     toggle.setAttribute("aria-expanded", String(recentVisitorsExpanded));
-    toggle.style.display = cachedRecentVisitors.length <= 5 ? "none" : "";
+    toggle.style.display = cachedRecentVisitors.length <= 6 ? "none" : "";
   }
 
   recentList.innerHTML = `
@@ -307,12 +307,12 @@ function drawTopVisitors() {
   const container = document.getElementById("topVisitorsList");
   if (!container) return;
 
-  const visible = topVisitorsExpanded ? cachedTopVisitors : cachedTopVisitors.slice(0, 5);
+  const visible = topVisitorsExpanded ? cachedTopVisitors : cachedTopVisitors.slice(0, 6);
   const toggle = document.getElementById("topVisitorsToggle");
   if (toggle) {
     toggle.textContent = topVisitorsExpanded ? "收起" : "展开更多";
     toggle.setAttribute("aria-expanded", String(topVisitorsExpanded));
-    toggle.style.display = cachedTopVisitors.length <= 5 ? "none" : "";
+    toggle.style.display = cachedTopVisitors.length <= 6 ? "none" : "";
   }
 
   if (visible.length === 0) {
