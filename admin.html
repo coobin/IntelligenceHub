@@ -393,15 +393,18 @@
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 32px;">
             <div class="chart-container">
               <div class="chart-title-row">
-                <h3>历史访问人数 Top 20</h3>
-                <span id="topVisitorsPeriod" style="font-size: 12px; color: #94a3b8;"></span>
+                <h3>历史访问人数排行</h3>
+                <button class="compact-toggle" id="topVisitorsToggle" type="button" aria-expanded="false">展开更多</button>
               </div>
               <div id="topVisitorsList">
                 <!-- 动态加载 -->
               </div>
             </div>
             <div class="chart-container">
-              <h3 style="margin-bottom: 24px; font-size: 16px; color: #1e293b;">最近访客记录</h3>
+              <div class="chart-title-row">
+                <h3>最近访客记录</h3>
+                <button class="compact-toggle" id="recentVisitorsToggle" type="button" aria-expanded="false">展开更多</button>
+              </div>
               <div id="recentList">
                 <!-- 动态加载列表 -->
               </div>
@@ -504,6 +507,6 @@
       </div>
     </div>
 
-    <script src="admin.js?v=20260707_01"></script>
+    <script src="admin.js?v=20260707_02"></script>
   </body>
 </html>

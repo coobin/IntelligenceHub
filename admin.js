@@ -1,5 +1,9 @@
 let catalog = { sections: [] };
 let allEntryClicksExpanded = false;
+let topVisitorsExpanded = false;
+let recentVisitorsExpanded = false;
+let cachedTopVisitors = [];
+let cachedRecentVisitors = [];
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) => ({
@@ -70,6 +74,16 @@ document.getElementById("allEntryClicksToggle").addEventListener("click", () => 
   panel.classList.toggle("hidden", !allEntryClicksExpanded);
   toggle.setAttribute("aria-expanded", String(allEntryClicksExpanded));
   toggle.innerText = allEntryClicksExpanded ? "收起" : "全部入口";
+});
+
+document.getElementById("topVisitorsToggle").addEventListener("click", () => {
+  topVisitorsExpanded = !topVisitorsExpanded;
+  drawTopVisitors();
+});
+
+document.getElementById("recentVisitorsToggle").addEventListener("click", () => {
+  recentVisitorsExpanded = !recentVisitorsExpanded;
+  drawRecentVisitors();
 });
 
 // 加载数据
@@ -162,8 +176,22 @@ function renderStats(stats) {
     `;
   }).join("");
 
-  // 渲染最近访客
+  cachedRecentVisitors = (stats.recent || []).slice(0, 20);
+  drawRecentVisitors();
+}
+
+function drawRecentVisitors() {
   const recentList = document.getElementById("recentList");
+  if (!recentList) return;
+
+  const visible = recentVisitorsExpanded ? cachedRecentVisitors : cachedRecentVisitors.slice(0, 5);
+  const toggle = document.getElementById("recentVisitorsToggle");
+  if (toggle) {
+    toggle.textContent = recentVisitorsExpanded ? "收起" : "展开更多";
+    toggle.setAttribute("aria-expanded", String(recentVisitorsExpanded));
+    toggle.style.display = cachedRecentVisitors.length <= 5 ? "none" : "";
+  }
+
   recentList.innerHTML = `
     <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
       <thead>
@@ -175,7 +203,7 @@ function renderStats(stats) {
         </tr>
       </thead>
       <tbody>
-        ${(stats.recent || []).map(r => `
+        ${visible.map(r => `
           <tr style="border-bottom: 1px solid #f8fafc;">
             <td style="padding: 12px 8px; color: #1e293b;">${escapeHtml(r.time)}</td>
             <td style="padding: 12px 8px;"><span style="font-weight: 600; color: var(--admin-accent);">${escapeHtml(r.user || "未知")}</span></td>
@@ -261,35 +289,41 @@ function renderAllEntryClicks(clicks) {
 }
 
 function renderTopVisitors(dailyUV) {
-  const container = document.getElementById("topVisitorsList");
-  const periodLabel = document.getElementById("topVisitorsPeriod");
-  if (!container) return;
-
   const userDays = {};
-  const dates = Object.keys(dailyUV || {}).sort();
-  for (const day of dates) {
+  for (const day of Object.keys(dailyUV || {})) {
     for (const user of dailyUV[day] || []) {
       userDays[user] = (userDays[user] || 0) + 1;
     }
   }
 
-  if (dates.length > 0) {
-    periodLabel.textContent = `${dates[0]} ~ ${dates[dates.length - 1]}`;
-  }
-
-  const sorted = Object.entries(userDays)
+  cachedTopVisitors = Object.entries(userDays)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 20);
 
-  if (sorted.length === 0) {
+  drawTopVisitors();
+}
+
+function drawTopVisitors() {
+  const container = document.getElementById("topVisitorsList");
+  if (!container) return;
+
+  const visible = topVisitorsExpanded ? cachedTopVisitors : cachedTopVisitors.slice(0, 5);
+  const toggle = document.getElementById("topVisitorsToggle");
+  if (toggle) {
+    toggle.textContent = topVisitorsExpanded ? "收起" : "展开更多";
+    toggle.setAttribute("aria-expanded", String(topVisitorsExpanded));
+    toggle.style.display = cachedTopVisitors.length <= 5 ? "none" : "";
+  }
+
+  if (visible.length === 0) {
     container.innerHTML = '<p style="color:#94a3b8; text-align:center; padding:20px;">暂无访客数据</p>';
     return;
   }
 
-  const maxDays = sorted[0][1];
-  container.innerHTML = sorted.map(([user, days], i) => {
+  const maxDays = cachedTopVisitors[0][1];
+  container.innerHTML = visible.map(([user, days], i) => {
     const rank = i + 1;
-    const medal = rank <= 3 ? ["🥇", "🥈", "🥉"][rank - 1] : `<span style="display:inline-block;width:20px;text-align:center;color:#94a3b8;font-size:13px;">${rank}</span>`;
+    const medal = rank <= 3 ? ["\u{1F947}", "\u{1F948}", "\u{1F949}"][rank - 1] : `<span style="display:inline-block;width:20px;text-align:center;color:#94a3b8;font-size:13px;">${rank}</span>`;
     return `
       <div class="rank-item">
         <span style="display:flex;align-items:center;gap:8px;min-width:120px;">

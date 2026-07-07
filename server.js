@@ -415,7 +415,7 @@ app.post("/api/track", (req, res) => {
         ip: truncateText(req.ip.replace("::ffff:", ""), 80),
         ua: truncateText(req.headers["user-agent"], 300)
       };
-      stats.recent = [visitor, ...(stats.recent || [])].slice(0, 10);
+      stats.recent = [visitor, ...(stats.recent || [])].slice(0, 20);
     } else if (type === "click" && target) {
       const clickTarget = truncateText(target, 120);
       if (!clickTarget) return res.status(400).json({ success: false });
