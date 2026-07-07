@@ -133,6 +133,7 @@ function renderStats(stats) {
   `).join("") || '<p style="color:#94a3b8; text-align:center; padding:20px;">暂无点击数据</p>';
 
   renderAllEntryClicks(stats.clicks || {});
+  renderTopVisitors(stats.dailyUV);
 
   // 渲染趋势 (最近 7 天)
   const trendList = document.getElementById("trendList");
@@ -257,6 +258,51 @@ function renderAllEntryClicks(clicks) {
       </tbody>
     </table>
   `;
+}
+
+function renderTopVisitors(dailyUV) {
+  const container = document.getElementById("topVisitorsList");
+  const periodLabel = document.getElementById("topVisitorsPeriod");
+  if (!container) return;
+
+  const userDays = {};
+  const dates = Object.keys(dailyUV || {}).sort();
+  for (const day of dates) {
+    for (const user of dailyUV[day] || []) {
+      userDays[user] = (userDays[user] || 0) + 1;
+    }
+  }
+
+  if (dates.length > 0) {
+    periodLabel.textContent = `${dates[0]} ~ ${dates[dates.length - 1]}`;
+  }
+
+  const sorted = Object.entries(userDays)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 20);
+
+  if (sorted.length === 0) {
+    container.innerHTML = '<p style="color:#94a3b8; text-align:center; padding:20px;">暂无访客数据</p>';
+    return;
+  }
+
+  const maxDays = sorted[0][1];
+  container.innerHTML = sorted.map(([user, days], i) => {
+    const rank = i + 1;
+    const medal = rank <= 3 ? ["🥇", "🥈", "🥉"][rank - 1] : `<span style="display:inline-block;width:20px;text-align:center;color:#94a3b8;font-size:13px;">${rank}</span>`;
+    return `
+      <div class="rank-item">
+        <span style="display:flex;align-items:center;gap:8px;min-width:120px;">
+          <span style="font-size:16px;">${medal}</span>
+          <span style="font-size:14px;font-weight:${rank <= 3 ? 600 : 400};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(user)}</span>
+        </span>
+        <div class="bar-outer">
+          <div class="bar-inner" style="width:${(toNumber(days) / maxDays) * 100}%"></div>
+        </div>
+        <span style="font-weight:600;color:#1e293b;white-space:nowrap;">${toNumber(days)} 天</span>
+      </div>
+    `;
+  }).join("");
 }
 
 function parseUA(ua) {
