@@ -184,12 +184,12 @@ function drawRecentVisitors() {
   const recentList = document.getElementById("recentList");
   if (!recentList) return;
 
-  const visible = recentVisitorsExpanded ? cachedRecentVisitors : cachedRecentVisitors.slice(0, 6);
+  const visible = recentVisitorsExpanded ? cachedRecentVisitors : cachedRecentVisitors.slice(0, 5);
   const toggle = document.getElementById("recentVisitorsToggle");
   if (toggle) {
     toggle.textContent = recentVisitorsExpanded ? "收起" : "展开更多";
     toggle.setAttribute("aria-expanded", String(recentVisitorsExpanded));
-    toggle.style.display = cachedRecentVisitors.length <= 6 ? "none" : "";
+    toggle.style.display = cachedRecentVisitors.length <= 5 ? "none" : "";
   }
 
   recentList.innerHTML = `
