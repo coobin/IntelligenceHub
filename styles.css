@@ -1027,6 +1027,269 @@ h1 {
   transform: none;
 }
 
+/* 通讯费报销历史：月度账单卡片，强调“发票金额 / 实报金额”的对应关系。 */
+.assistant-message-expense {
+  width: min(100%, 560px);
+  max-width: 100%;
+}
+
+.assistant-message-system .assistant-message-content.has-expense-ui {
+  width: 100%;
+  padding: 0;
+  overflow: visible;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.expense-ui {
+  overflow: hidden;
+  position: relative;
+  color: #17263a;
+  background: #fff;
+  border: 1px solid #d7e3ed;
+  border-radius: 18px;
+  box-shadow: 0 14px 34px rgba(29, 50, 82, 0.11);
+}
+
+.expense-ui::before {
+  content: "";
+  display: block;
+  height: 4px;
+  background: #137b70;
+}
+
+.expense-ui-header {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid #e5edf3;
+}
+
+.expense-ui-icon {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  color: #137b70;
+  background: #e8f6f3;
+  border-radius: 12px;
+}
+
+.expense-ui-icon svg {
+  width: 19px;
+  height: 19px;
+}
+
+.expense-ui-heading {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.expense-ui-heading small {
+  color: #137b70;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+}
+
+.expense-ui-heading strong {
+  overflow: hidden;
+  font-size: 15px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.expense-range {
+  padding: 4px 8px;
+  color: #4b6670;
+  background: #edf5f5;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.expense-ui-body {
+  padding: 14px;
+}
+
+.expense-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 11px;
+}
+
+.expense-summary > span {
+  display: grid;
+  gap: 4px;
+  padding: 11px 12px;
+  background: #f4f8fb;
+  border: 1px solid #e0e9f0;
+  border-radius: 12px;
+}
+
+.expense-summary > span:last-child {
+  background: #eaf7f3;
+  border-color: #cce9e1;
+}
+
+.expense-summary small,
+.expense-record-amounts small {
+  color: #6c7d8d;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.expense-summary strong {
+  color: #17304a;
+  font-family: "DIN Alternate", "SFMono-Regular", Consolas, monospace;
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+}
+
+.expense-summary > span:last-child strong {
+  color: #106c62;
+}
+
+.expense-ui-message {
+  margin: 0 2px 11px;
+  color: #637486;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.expense-record-list {
+  display: grid;
+  gap: 8px;
+}
+
+.expense-record {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 11px;
+  align-items: stretch;
+  padding: 10px;
+  background: #fbfcfe;
+  border: 1px solid #e0e8f0;
+  border-radius: 13px;
+}
+
+.expense-period {
+  display: grid;
+  place-content: center;
+  text-align: center;
+  color: #176f67;
+  background: #eaf6f3;
+  border: 1px dashed #add9d0;
+  border-radius: 10px;
+}
+
+.expense-period small {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.expense-period strong {
+  font-family: "DIN Alternate", "SFMono-Regular", Consolas, monospace;
+  font-size: 19px;
+  line-height: 1;
+}
+
+.expense-record-main {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.expense-record-phone {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  color: #4f6275;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.expense-record-phone svg {
+  width: 12px;
+  height: 12px;
+  color: #6a7d8d;
+  flex: 0 0 auto;
+}
+
+.expense-record-phone span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.expense-record-amounts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.expense-record-amounts > span {
+  display: grid;
+  gap: 2px;
+}
+
+.expense-record-amounts strong {
+  color: #1b2f45;
+  font-family: "DIN Alternate", "SFMono-Regular", Consolas, monospace;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.expense-record-amounts > span:last-child strong {
+  color: #137b70;
+}
+
+.expense-ui-footer {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 11px;
+  padding: 9px 2px 0;
+  color: #778695;
+  border-top: 1px dashed #d8e2ea;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.expense-empty-state {
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+  padding: 22px 14px 20px;
+  text-align: center;
+}
+
+.expense-empty-state svg {
+  width: 27px;
+  height: 27px;
+  color: #5d7c83;
+}
+
+.expense-empty-state strong {
+  font-size: 14px;
+}
+
+.expense-empty-state span {
+  color: #697a8b;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
 @media (max-width: 520px) {
   .assistant-messages {
     padding-left: 10px;
@@ -1049,6 +1312,30 @@ h1 {
 
   .meeting-ticket-time strong {
     font-size: 20px;
+  }
+
+  .expense-ui-header {
+    grid-template-columns: 34px minmax(0, 1fr);
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .expense-range {
+    display: none;
+  }
+
+  .expense-ui-body {
+    padding: 11px;
+  }
+
+  .expense-summary strong {
+    font-size: 18px;
+  }
+
+  .expense-record {
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 9px;
+    padding: 9px;
   }
 }
 

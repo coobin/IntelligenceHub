@@ -320,6 +320,8 @@ const CHAT_HISTORY_MAX_CHARS = 600000;
 
 const MEETING_UI_START = "[CHENCY_MEETING_UI]";
 const MEETING_UI_END = "[/CHENCY_MEETING_UI]";
+const EXPENSE_UI_START = "[CHENCY_EXPENSE_UI]";
+const EXPENSE_UI_END = "[/CHENCY_EXPENSE_UI]";
 
 function parseMeetingUiReply(text) {
   const source = String(text || "");
@@ -360,6 +362,51 @@ function findMeetingUiPayload(value, depth = 0) {
     if (value.schema === "chency.meeting.v1") return value;
     for (const item of Object.values(value)) {
       const found = findMeetingUiPayload(item, depth + 1);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+function parseExpenseUiReply(text) {
+  const source = String(text || "");
+  const start = source.lastIndexOf(EXPENSE_UI_START);
+  if (start === -1) return { cleanText: source, ui: null };
+  const end = source.indexOf(EXPENSE_UI_END, start + EXPENSE_UI_START.length);
+  const cleanText = source.slice(0, start).trim();
+  if (end === -1) return { cleanText, ui: null };
+  try {
+    const raw = source.slice(start + EXPENSE_UI_START.length, end).trim();
+    const ui = JSON.parse(raw);
+    return ui && ui.schema === "chency.expense.v1" ? { cleanText, ui } : { cleanText: source, ui: null };
+  } catch (error) {
+    console.warn("[Expense UI] invalid payload", error);
+    return { cleanText: source, ui: null };
+  }
+}
+
+function findExpenseUiPayload(value, depth = 0) {
+  if (value == null || depth > 6) return null;
+  if (typeof value === "string") {
+    const markedPayload = parseExpenseUiReply(value).ui;
+    if (markedPayload) return markedPayload;
+    try {
+      return findExpenseUiPayload(JSON.parse(value), depth + 1);
+    } catch (error) {
+      return null;
+    }
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findExpenseUiPayload(item, depth + 1);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (typeof value === "object") {
+    if (value.schema === "chency.expense.v1") return value;
+    for (const item of Object.values(value)) {
+      const found = findExpenseUiPayload(item, depth + 1);
       if (found) return found;
     }
   }
@@ -571,6 +618,64 @@ function renderMeetingUi(ui) {
         ${issues}
         ${suggestions}
         ${actions}
+      </div>
+    </section>
+  `;
+}
+
+function expenseMoney(value) {
+  const amount = Number(value || 0);
+  return `¥${Number.isFinite(amount) ? amount.toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00"}`;
+}
+
+function expensePeriodParts(period) {
+  const match = /^(\d{4})(\d{2})$/.exec(String(period || ""));
+  return match ? { year: match[1], month: match[2] } : { year: "账期", month: String(period || "未知") };
+}
+
+function renderExpenseUi(ui) {
+  const records = Array.isArray(ui.records) ? ui.records : [];
+  const summary = ui.summary || {};
+  const isEmpty = ui.type === "history_empty" || records.length === 0;
+  const recordList = records.map((record) => {
+    const period = expensePeriodParts(record.period);
+    return `
+      <article class="expense-record">
+        <div class="expense-period"><small>${escapeHtml(period.year)}</small><strong>${escapeHtml(period.month)}</strong></div>
+        <div class="expense-record-main">
+          <div class="expense-record-phone"><i data-lucide="smartphone"></i><span>${escapeHtml(record.phone || (record.phones || []).join(" / ") || "号码未知")}</span></div>
+          <div class="expense-record-amounts">
+            <span><small>发票金额</small><strong>${escapeHtml(expenseMoney(record.invoiceAmount))}</strong></span>
+            <span><small>实报金额</small><strong>${escapeHtml(expenseMoney(record.reimbursedAmount))}</strong></span>
+          </div>
+        </div>
+      </article>
+    `;
+  }).join("");
+
+  return `
+    <section class="expense-ui${isEmpty ? " expense-ui--empty" : ""}" data-expense-ui="${escapeAttribute(ui.type || "history_results")}">
+      <header class="expense-ui-header">
+        <span class="expense-ui-icon"><i data-lucide="receipt-text"></i></span>
+        <span class="expense-ui-heading"><small>通讯费报销</small><strong>${escapeHtml(ui.title || "历史报销记录")}</strong></span>
+        <span class="expense-range">${escapeHtml(ui.range?.label || "最近一年")}</span>
+      </header>
+      <div class="expense-ui-body">
+        ${isEmpty ? `
+          <div class="expense-empty-state">
+            <i data-lucide="receipt"></i>
+            <strong>暂无报销记录</strong>
+            <span>${escapeHtml(ui.message || "最近一年没有已确认的通讯费报销。")}</span>
+          </div>
+        ` : `
+          <div class="expense-summary">
+            <span><small>发票合计</small><strong>${escapeHtml(expenseMoney(summary.invoiceAmount))}</strong></span>
+            <span><small>实报合计</small><strong>${escapeHtml(expenseMoney(summary.reimbursedAmount))}</strong></span>
+          </div>
+          <p class="expense-ui-message">${escapeHtml(ui.message || "按账期汇总已确认报销。")}</p>
+          <div class="expense-record-list">${recordList}</div>
+          <footer class="expense-ui-footer"><span>${Number(summary.count || records.length)} 个账期</span><span>${escapeHtml(ui.range?.label || "最近一年")}</span></footer>
+        `}
       </div>
     </section>
   `;
@@ -821,26 +926,40 @@ function renderAssistant() {
   };
 
   const renderSystemReply = (contentDiv, text, complete = false) => {
-    const parsed = parseMeetingUiReply(text);
-    if (complete && parsed.ui) {
-      if (parsed.ui.type === "booking_needs_info" && latestRequestText) {
+    const meetingParsed = parseMeetingUiReply(text);
+    const expenseParsed = parseExpenseUiReply(text);
+    if (complete && expenseParsed.ui) {
+      contentDiv.parentElement?.classList.remove("assistant-message-meeting");
+      contentDiv.parentElement?.classList.add("assistant-message-expense");
+      contentDiv.classList.remove("has-meeting-ui");
+      contentDiv.classList.add("has-expense-ui");
+      contentDiv.innerHTML = renderExpenseUi(expenseParsed.ui);
+      if (window.lucide) window.lucide.createIcons();
+      return;
+    }
+    if (complete && meetingParsed.ui) {
+      if (meetingParsed.ui.type === "booking_needs_info" && latestRequestText) {
         pendingMeetingContinuation = {
           operation: "book",
           query: latestRequestText,
         };
-      } else if (parsed.ui.type !== "booking_needs_info") {
+      } else if (meetingParsed.ui.type !== "booking_needs_info") {
         pendingMeetingContinuation = null;
       }
+      contentDiv.parentElement?.classList.remove("assistant-message-expense");
       contentDiv.parentElement?.classList.add("assistant-message-meeting");
+      contentDiv.classList.remove("has-expense-ui");
       contentDiv.classList.add("has-meeting-ui");
-      contentDiv.innerHTML = renderMeetingUi(parsed.ui);
-      bindMeetingUiActions(contentDiv, parsed.ui);
+      contentDiv.innerHTML = renderMeetingUi(meetingParsed.ui);
+      bindMeetingUiActions(contentDiv, meetingParsed.ui);
       if (window.lucide) window.lucide.createIcons();
       return;
     }
     contentDiv.parentElement?.classList.remove("assistant-message-meeting");
+    contentDiv.parentElement?.classList.remove("assistant-message-expense");
     contentDiv.classList.remove("has-meeting-ui");
-    const visibleText = parsed.cleanText || (complete ? text : "");
+    contentDiv.classList.remove("has-expense-ui");
+    const visibleText = meetingParsed.cleanText || expenseParsed.cleanText || (complete ? text : "");
     contentDiv.innerHTML = window.DOMPurify
       ? window.DOMPurify.sanitize(window.marked.parse(visibleText || ""))
       : escapeHtml(visibleText || "");
@@ -1106,8 +1225,8 @@ function renderAssistant() {
       text = text ? `${text}（通讯费发票报销）` : "我要报销这张通讯费发票";
     }
 
-    let holdMeetingCardStream = Boolean(options.meetingAction)
-      || /(会议|会议室|日程|行程|预定|预订|预约|退订|开会|取消|\bD\d{2}\b)/i.test(text);
+    let holdStructuredCardStream = Boolean(options.meetingAction)
+      || /(会议|会议室|日程|行程|预定|预订|预约|退订|开会|取消|\bD\d{2}\b|报销记录|历史报销|报销历史)/i.test(text);
     const queryDateRange = meetingQueryDateRange(text);
     
     appendMessage("user", userMessageHTML);
@@ -1143,6 +1262,7 @@ function renderAssistant() {
       const decoder = new TextDecoder("utf-8");
       let fullReply = "";
       let streamedMeetingUi = null;
+      let streamedExpenseUi = null;
       replyContentDiv.innerHTML = '<span class="assistant-typing" aria-label="思考中"><span class="assistant-typing-dot"></span><span class="assistant-typing-dot"></span><span class="assistant-typing-dot"></span></span>';
       
       let buffer = "";
@@ -1163,15 +1283,17 @@ function renderAssistant() {
               if (data.event === "node_finished") {
                 const nodeMeetingUi = findMeetingUiPayload(data.data?.outputs);
                 if (nodeMeetingUi) streamedMeetingUi = filterMeetingUiByDateRange(nodeMeetingUi, queryDateRange);
+                const nodeExpenseUi = findExpenseUiPayload(data.data?.outputs);
+                if (nodeExpenseUi) streamedExpenseUi = nodeExpenseUi;
               }
-              if (streamedMeetingUi) {
-                holdMeetingCardStream = true;
+              if (streamedMeetingUi || streamedExpenseUi) {
+                holdStructuredCardStream = true;
                 replyContentDiv.innerHTML = '<span class="assistant-typing" aria-label="思考中"><span class="assistant-typing-dot"></span><span class="assistant-typing-dot"></span><span class="assistant-typing-dot"></span></span>';
               }
               if (data.event === "message" || data.event === "agent_message") {
-                if (fullReply === "" && !holdMeetingCardStream) replyContentDiv.innerHTML = "";
+                if (fullReply === "" && !holdStructuredCardStream) replyContentDiv.innerHTML = "";
                 fullReply += data.answer || "";
-                if (!holdMeetingCardStream) {
+                if (!holdStructuredCardStream) {
                   renderSystemReply(replyContentDiv, fullReply, false);
                 }
                 messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -1187,7 +1309,10 @@ function renderAssistant() {
 
       const replyMeetingUi = findMeetingUiPayload(fullReply);
       const finalMeetingUi = filterMeetingUiByDateRange(replyMeetingUi || streamedMeetingUi, queryDateRange);
-      const finalReply = finalMeetingUi
+      const finalExpenseUi = findExpenseUiPayload(fullReply) || streamedExpenseUi;
+      const finalReply = finalExpenseUi
+        ? `${finalExpenseUi.message || ""}\n\n${EXPENSE_UI_START}${JSON.stringify(finalExpenseUi)}${EXPENSE_UI_END}`
+        : finalMeetingUi
         ? `${finalMeetingUi.message || ""}\n\n${MEETING_UI_START}${JSON.stringify(finalMeetingUi)}${MEETING_UI_END}`
         : fullReply;
       renderSystemReply(replyContentDiv, finalReply, true);

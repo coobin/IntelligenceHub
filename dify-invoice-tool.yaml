@@ -116,6 +116,9 @@ paths:
                   message:
                     type: string
                     description: 给用户看的报销记录摘要（直接原样输出）
+                  ui:
+                    type: object
+                    description: chency.expense.v1 结构化报销历史卡片数据
   /dify/confirm:
     post:
       summary: 确认提交报销（按 ID）
