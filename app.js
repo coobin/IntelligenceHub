@@ -460,9 +460,45 @@ function meetingQueryDateRange(text, now = new Date()) {
     start = today;
     end = addLocalDays(today, 30);
     label = "接下来一个月";
+  } else if (/后天/.test(source)) {
+    start = addLocalDays(today, 2);
+    end = start;
+    label = "后天";
+  } else if (/明天/.test(source)) {
+    start = addLocalDays(today, 1);
+    end = start;
+    label = "明天";
+  } else if (/今天|今日/.test(source)) {
+    start = today;
+    end = today;
+    label = "今天";
   }
 
   return start && end ? { start: isoLocalDate(start), end: isoLocalDate(end), label } : null;
+}
+
+function selectMeetingUiCandidate(candidates, range) {
+  const valid = candidates.filter((ui) => ui?.schema === "chency.meeting.v1");
+  if (!valid.length) return null;
+
+  const latest = valid[valid.length - 1];
+  if (!["query_results", "query_empty"].includes(latest.type)) return latest;
+
+  const queryCandidates = valid.filter((ui) => ["query_results", "query_empty"].includes(ui.type));
+
+  const countMeetings = (ui) => (Array.isArray(ui.meetings) ? ui.meetings : [])
+    .filter((meeting) => !range || (meeting?.date >= range.start && meeting?.date <= range.end))
+    .length;
+  let selected = queryCandidates[0];
+  let selectedCount = countMeetings(selected);
+  for (const candidate of queryCandidates.slice(1)) {
+    const count = countMeetings(candidate);
+    if (count >= selectedCount) {
+      selected = candidate;
+      selectedCount = count;
+    }
+  }
+  return selected;
 }
 
 function filterMeetingUiByDateRange(ui, range) {
@@ -491,6 +527,28 @@ function formatMeetingDate(date) {
   const value = new Date(`${date}T12:00:00`);
   const weekday = new Intl.DateTimeFormat("zh-CN", { weekday: "short" }).format(value);
   return `${Number(match[2])}月${Number(match[3])}日 ${weekday}`;
+}
+
+function normalizeMeetingMessage(value) {
+  return String(value || "")
+    .replace(/\\r\\n|\\n|\\r/g, " ")
+    .replace(/\r?\n/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/\s+([，。；：])/g, "$1")
+    .trim();
+}
+
+function meetingDisplayMessage(ui) {
+  const normalized = normalizeMeetingMessage(ui?.message);
+  if (ui?.type !== "query_results") return normalized;
+  if (/^已按/.test(normalized)) return normalized;
+
+  const meetings = Array.isArray(ui.meetings) ? ui.meetings : [];
+  const dates = [...new Set(meetings.map((meeting) => meeting?.date).filter(Boolean))];
+  if (dates.length === 1) {
+    return `已查询到 ${meetings.length} 场 ${formatMeetingDate(dates[0])} 的会议。`;
+  }
+  return `已查询到 ${meetings.length} 场会议，详情如下。`;
 }
 
 function meetingDurationLabel(meeting) {
@@ -593,6 +651,7 @@ function renderMeetingUi(ui) {
   const meetingList = renderMeetingList(ui);
   const isBookingPreview = ui.type === "booking_preview";
   const isCancelPreview = ui.type === "cancel_preview";
+  const displayMessage = meetingDisplayMessage(ui);
   const actionToken = ui.action?.token || "";
   const actions = isBookingPreview || isCancelPreview
     ? `
@@ -615,7 +674,7 @@ function renderMeetingUi(ui) {
         ${statusNote ? `<span class="meeting-ui-status-note">${escapeHtml(statusNote)}</span>` : ""}
       </header>
       <div class="meeting-ui-body">
-        ${ui.message ? `<p class="meeting-ui-message">${escapeHtml(ui.message)}</p>` : ""}
+        ${displayMessage ? `<p class="meeting-ui-message">${escapeHtml(displayMessage)}</p>` : ""}
         ${mainMeeting}
         ${meetingList}
         ${issues}
@@ -1264,7 +1323,7 @@ function renderAssistant() {
       const reader = response.body.getReader();
       const decoder = new TextDecoder("utf-8");
       let fullReply = "";
-      let streamedMeetingUi = null;
+      const streamedMeetingUis = [];
       let streamedExpenseUi = null;
       replyContentDiv.innerHTML = '<span class="assistant-typing" aria-label="思考中"><span class="assistant-typing-dot"></span><span class="assistant-typing-dot"></span><span class="assistant-typing-dot"></span></span>';
       
@@ -1285,11 +1344,11 @@ function renderAssistant() {
               const data = JSON.parse(dataStr);
               if (data.event === "node_finished") {
                 const nodeMeetingUi = findMeetingUiPayload(data.data?.outputs);
-                if (nodeMeetingUi) streamedMeetingUi = filterMeetingUiByDateRange(nodeMeetingUi, queryDateRange);
+                if (nodeMeetingUi) streamedMeetingUis.push(nodeMeetingUi);
                 const nodeExpenseUi = findExpenseUiPayload(data.data?.outputs);
                 if (nodeExpenseUi) streamedExpenseUi = nodeExpenseUi;
               }
-              if (streamedMeetingUi || streamedExpenseUi) {
+              if (streamedMeetingUis.length || streamedExpenseUi) {
                 holdStructuredCardStream = true;
                 replyContentDiv.innerHTML = '<span class="assistant-typing" aria-label="思考中"><span class="assistant-typing-dot"></span><span class="assistant-typing-dot"></span><span class="assistant-typing-dot"></span></span>';
               }
@@ -1311,7 +1370,11 @@ function renderAssistant() {
       }
 
       const replyMeetingUi = findMeetingUiPayload(fullReply);
-      const finalMeetingUi = filterMeetingUiByDateRange(replyMeetingUi || streamedMeetingUi, queryDateRange);
+      const selectedMeetingUi = selectMeetingUiCandidate(
+        replyMeetingUi ? [...streamedMeetingUis, replyMeetingUi] : streamedMeetingUis,
+        queryDateRange,
+      );
+      const finalMeetingUi = filterMeetingUiByDateRange(selectedMeetingUi, queryDateRange);
       const finalExpenseUi = findExpenseUiPayload(fullReply) || streamedExpenseUi;
       const finalReply = finalExpenseUi
         ? `${finalExpenseUi.message || ""}\n\n${EXPENSE_UI_START}${JSON.stringify(finalExpenseUi)}${EXPENSE_UI_END}`
