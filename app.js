@@ -338,6 +338,103 @@ function parseMeetingUiReply(text) {
   }
 }
 
+function findMeetingUiPayload(value, depth = 0) {
+  if (value == null || depth > 6) return null;
+  if (typeof value === "string") {
+    const markedPayload = parseMeetingUiReply(value).ui;
+    if (markedPayload) return markedPayload;
+    try {
+      return findMeetingUiPayload(JSON.parse(value), depth + 1);
+    } catch (error) {
+      return null;
+    }
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findMeetingUiPayload(item, depth + 1);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (typeof value === "object") {
+    if (value.schema === "chency.meeting.v1") return value;
+    for (const item of Object.values(value)) {
+      const found = findMeetingUiPayload(item, depth + 1);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+function isoLocalDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function addLocalDays(date, days) {
+  const result = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  result.setDate(result.getDate() + days);
+  return result;
+}
+
+function meetingQueryDateRange(text, now = new Date()) {
+  const source = String(text || "").replace(/\s+/g, "");
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let start = null;
+  let end = null;
+  let label = "";
+
+  const rollingDays = source.match(/(?:接下来|未来)(\d{1,2})天/);
+  if (rollingDays) {
+    const days = Math.min(31, Math.max(1, Number(rollingDays[1])));
+    start = today;
+    end = addLocalDays(today, days);
+    label = `接下来 ${days} 天`;
+  } else if (/(接下来|未来|下一个)(一个|1个)?(星期|周)|一周内|一个星期内/.test(source)) {
+    start = today;
+    end = addLocalDays(today, 7);
+    label = "接下来一个星期";
+  } else if (/下周|下个星期/.test(source)) {
+    const weekday = today.getDay() || 7;
+    start = addLocalDays(today, 8 - weekday);
+    end = addLocalDays(start, 6);
+    label = "下周";
+  } else if (/本周|这周|这个星期/.test(source)) {
+    const weekday = today.getDay() || 7;
+    start = addLocalDays(today, 1 - weekday);
+    end = addLocalDays(start, 6);
+    label = "本周";
+  } else if (/(接下来|未来)(一个|1个)?月/.test(source)) {
+    start = today;
+    end = addLocalDays(today, 30);
+    label = "接下来一个月";
+  }
+
+  return start && end ? { start: isoLocalDate(start), end: isoLocalDate(end), label } : null;
+}
+
+function filterMeetingUiByDateRange(ui, range) {
+  if (!ui || !range || !["query_results", "query_empty"].includes(ui.type)) return ui;
+  const meetings = (Array.isArray(ui.meetings) ? ui.meetings : [])
+    .filter((meeting) => meeting?.date >= range.start && meeting?.date <= range.end);
+  const hasMeetings = meetings.length > 0;
+  const scope = `${range.start} 至 ${range.end}`;
+  return {
+    ...ui,
+    type: hasMeetings ? "query_results" : "query_empty",
+    status: "info",
+    title: hasMeetings ? `查询到 ${meetings.length} 场会议` : "没有查到会议",
+    message: hasMeetings
+      ? `已按${range.label}筛选，仅显示 ${scope} 的会议。`
+      : `${scope} 没有查询到会议。`,
+    meetings,
+    filters: { ...(ui.filters || {}), dateFrom: range.start, dateTo: range.end },
+    meta: { ...(ui.meta || {}), count: meetings.length },
+  };
+}
+
 function formatMeetingDate(date) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(date || ""));
   if (!match) return String(date || "日期待定");
@@ -1011,6 +1108,7 @@ function renderAssistant() {
 
     let holdMeetingCardStream = Boolean(options.meetingAction)
       || /(会议|会议室|日程|行程|预定|预订|预约|退订|开会|取消|\bD\d{2}\b)/i.test(text);
+    const queryDateRange = meetingQueryDateRange(text);
     
     appendMessage("user", userMessageHTML);
     if (window.lucide) window.lucide.createIcons();
@@ -1044,6 +1142,7 @@ function renderAssistant() {
       const reader = response.body.getReader();
       const decoder = new TextDecoder("utf-8");
       let fullReply = "";
+      let streamedMeetingUi = null;
       replyContentDiv.innerHTML = '<span class="assistant-typing" aria-label="思考中"><span class="assistant-typing-dot"></span><span class="assistant-typing-dot"></span><span class="assistant-typing-dot"></span></span>';
       
       let buffer = "";
@@ -1061,7 +1160,11 @@ function renderAssistant() {
             if (!dataStr || dataStr === "[DONE]") continue;
             try {
               const data = JSON.parse(dataStr);
-              if (data.event === "node_finished" && JSON.stringify(data.data?.outputs || {}).includes(MEETING_UI_START)) {
+              if (data.event === "node_finished") {
+                const nodeMeetingUi = findMeetingUiPayload(data.data?.outputs);
+                if (nodeMeetingUi) streamedMeetingUi = filterMeetingUiByDateRange(nodeMeetingUi, queryDateRange);
+              }
+              if (streamedMeetingUi) {
                 holdMeetingCardStream = true;
                 replyContentDiv.innerHTML = '<span class="assistant-typing" aria-label="思考中"><span class="assistant-typing-dot"></span><span class="assistant-typing-dot"></span><span class="assistant-typing-dot"></span></span>';
               }
@@ -1082,8 +1185,13 @@ function renderAssistant() {
         }
       }
 
-      renderSystemReply(replyContentDiv, fullReply, true);
-      rememberMessage("system", fullReply);
+      const replyMeetingUi = findMeetingUiPayload(fullReply);
+      const finalMeetingUi = filterMeetingUiByDateRange(replyMeetingUi || streamedMeetingUi, queryDateRange);
+      const finalReply = finalMeetingUi
+        ? `${finalMeetingUi.message || ""}\n\n${MEETING_UI_START}${JSON.stringify(finalMeetingUi)}${MEETING_UI_END}`
+        : fullReply;
+      renderSystemReply(replyContentDiv, finalReply, true);
+      rememberMessage("system", finalReply);
       messagesEl.scrollTop = messagesEl.scrollHeight;
 
       // 合规回执后追加「确认报销 / 放弃」按钮
