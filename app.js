@@ -602,8 +602,9 @@ function renderAssistant() {
         lockMeetingCard(root, "正在确认...");
         pendingMeetingAction = null;
         sendMessage({
-          queryText: `${label}\n[meeting_confirmation_token:${token}]`,
+          queryText: label,
           displayText: label,
+          meetingAction: { operation, token },
         });
       });
     });
@@ -806,8 +807,12 @@ function renderAssistant() {
 
     if (options.queryText === undefined && pendingMeetingAction && /^(确认|确认预定|确认取消|确定|可以|没问题)[。！!\s]*$/.test(typedText)) {
       const label = pendingMeetingAction.operation === "cancel" ? "确认取消" : "确认预定";
-      text = `${label}\n[meeting_confirmation_token:${pendingMeetingAction.token}]`;
+      text = label;
       displayText = typedText || label;
+      options.meetingAction = {
+        operation: pendingMeetingAction.operation,
+        token: pendingMeetingAction.token,
+      };
       lockMeetingCard(pendingMeetingAction.root, "正在确认...");
       pendingMeetingAction = null;
     } else if (options.queryText === undefined && pendingMeetingAction && /^(不取消|保留|算了|暂不|放弃)[。！!\s]*$/.test(typedText)) {
@@ -856,7 +861,10 @@ function renderAssistant() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          inputs: {},
+          inputs: options.meetingAction ? {
+            meeting_action: options.meetingAction.operation,
+            meeting_confirmation_token: options.meetingAction.token,
+          } : {},
           query: text,
           response_mode: "streaming",
           conversation_id: chatConversationId || "",
