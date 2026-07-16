@@ -314,6 +314,167 @@ function renderCard(item) {
 
 let chatConversationId = "";
 
+const MEETING_UI_START = "[CHENCY_MEETING_UI]";
+const MEETING_UI_END = "[/CHENCY_MEETING_UI]";
+
+function parseMeetingUiReply(text) {
+  const source = String(text || "");
+  const start = source.lastIndexOf(MEETING_UI_START);
+  if (start === -1) return { cleanText: source, ui: null };
+  const end = source.indexOf(MEETING_UI_END, start + MEETING_UI_START.length);
+  const cleanText = source.slice(0, start).trim();
+  if (end === -1) return { cleanText, ui: null };
+  try {
+    const raw = source.slice(start + MEETING_UI_START.length, end).trim();
+    const ui = JSON.parse(raw);
+    return ui && ui.schema === "chency.meeting.v1" ? { cleanText, ui } : { cleanText: source, ui: null };
+  } catch (error) {
+    console.warn("[Meeting UI] invalid payload", error);
+    return { cleanText: source, ui: null };
+  }
+}
+
+function formatMeetingDate(date) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(date || ""));
+  if (!match) return String(date || "日期待定");
+  const value = new Date(`${date}T12:00:00`);
+  const weekday = new Intl.DateTimeFormat("zh-CN", { weekday: "short" }).format(value);
+  return `${Number(match[2])}月${Number(match[3])}日 ${weekday}`;
+}
+
+function meetingDurationLabel(meeting) {
+  const toMinutes = (value) => {
+    const [hours, minutes] = String(value || "").split(":").map(Number);
+    return Number.isFinite(hours) && Number.isFinite(minutes) ? hours * 60 + minutes : 0;
+  };
+  const duration = toMinutes(meeting?.end) - toMinutes(meeting?.start);
+  if (duration <= 0) return "";
+  if (duration % 60 === 0) return `${duration / 60} 小时`;
+  if (duration > 60) return `${Math.floor(duration / 60)} 小时 ${duration % 60} 分钟`;
+  return `${duration} 分钟`;
+}
+
+function meetingStatusCopy(ui) {
+  const mapping = {
+    booking_preview: ["待确认", "尚未预定", "calendar-clock"],
+    booking_success: ["已完成", "已写入日程", "circle-check-big"],
+    booking_conflict: ["时间冲突", "本次未预定", "calendar-x-2"],
+    booking_needs_info: ["需要补充", "尚未预定", "circle-help"],
+    cancel_preview: ["待确认", "会议仍保留", "triangle-alert"],
+    cancel_candidates: ["请选择", "会议仍保留", "list-checks"],
+    cancel_success: ["已完成", "时段已释放", "circle-check-big"],
+    cancel_not_found: ["未找到", "没有执行取消", "search-x"],
+    confirmation_error: ["操作未执行", "请重新发起", "shield-alert"],
+    query_results: ["会议日程", `${Number(ui?.meta?.count || ui?.meetings?.length || 0)} 场`, "calendar-range"],
+    query_empty: ["会议日程", "暂无会议", "calendar-search"],
+  };
+  return mapping[ui?.type] || ["会议助手", "", "calendar-days"];
+}
+
+function renderMeetingTicket(meeting, options = {}) {
+  if (!meeting) return "";
+  const attendeeText = meeting.attendeeCount
+    ? `${meeting.attendeeCount} 位参会对象`
+    : "未添加参会人";
+  const summary = meeting.summary
+    ? `<p class="meeting-ticket-summary">${escapeHtml(meeting.summary)}</p>`
+    : "";
+  const cancelButton = options.cancelToken
+    ? `<button class="meeting-text-action meeting-action-preview-cancel" type="button" data-token="${escapeAttribute(options.cancelToken)}" data-meeting-id="${escapeAttribute(meeting.id)}">取消这场</button>`
+    : "";
+
+  return `
+    <article class="meeting-ticket">
+      <div class="meeting-time-rail" aria-hidden="true"><span></span><i></i><span></span></div>
+      <div class="meeting-ticket-body">
+        <div class="meeting-ticket-date-row">
+          <span class="meeting-ticket-date">${escapeHtml(formatMeetingDate(meeting.date))}</span>
+          <span class="meeting-room-chip"><i data-lucide="map-pin"></i>${escapeHtml(meeting.roomName || "会议室待定")}</span>
+        </div>
+        <h4>${escapeHtml(meeting.title || "无主题会议")}</h4>
+        <div class="meeting-ticket-time"><strong>${escapeHtml(meeting.start || "--:--")}</strong><span>—</span><strong>${escapeHtml(meeting.end || "--:--")}</strong></div>
+        <div class="meeting-ticket-meta">
+          <span><i data-lucide="user-round"></i>${escapeHtml(meeting.organizerName || "组织人待定")}</span>
+          <span><i data-lucide="clock-3"></i>${escapeHtml(meetingDurationLabel(meeting))}</span>
+          <span><i data-lucide="users-round"></i>${escapeHtml(attendeeText)}</span>
+        </div>
+        ${summary}
+        ${cancelButton ? `<div class="meeting-ticket-inline-action">${cancelButton}</div>` : ""}
+      </div>
+    </article>
+  `;
+}
+
+function renderMeetingList(ui) {
+  const meetings = Array.isArray(ui.meetings) ? ui.meetings : [];
+  if (!meetings.length) return "";
+  const groups = meetings.reduce((result, meeting) => {
+    const date = meeting.date || "日期待定";
+    if (!result[date]) result[date] = [];
+    result[date].push(meeting);
+    return result;
+  }, {});
+
+  return Object.entries(groups).map(([date, items]) => `
+    <section class="meeting-day-group">
+      <div class="meeting-day-heading"><span>${escapeHtml(formatMeetingDate(date))}</span><span>${items.length} 场</span></div>
+      <div class="meeting-day-list">
+        ${items.map((meeting) => renderMeetingTicket(meeting, {
+          cancelToken: (ui.type === "query_results" && meeting.canCancel) || ui.type === "cancel_candidates"
+            ? meeting.actionToken
+            : ""
+        })).join("")}
+      </div>
+    </section>
+  `).join("");
+}
+
+function renderMeetingUi(ui) {
+  const [eyebrow, statusNote, icon] = meetingStatusCopy(ui);
+  const status = ["pending", "success", "danger", "warning", "info"].includes(ui.status) ? ui.status : "info";
+  const issues = Array.isArray(ui.issues) && ui.issues.length
+    ? `<ul class="meeting-issues">${ui.issues.map((issue) => `<li>${escapeHtml(issue)}</li>`).join("")}</ul>`
+    : "";
+  const suggestions = Array.isArray(ui.suggestions) && ui.suggestions.length
+    ? `<div class="meeting-suggestions"><span>可选时间</span><div>${ui.suggestions.map((slot) => `<button class="meeting-suggestion" type="button" data-date="${escapeAttribute(ui.meeting?.date || "")}" data-start="${escapeAttribute(slot.start)}" data-end="${escapeAttribute(slot.end)}">${escapeHtml(slot.start)}–${escapeHtml(slot.end)}</button>`).join("")}</div></div>`
+    : "";
+  const mainMeeting = ui.meeting ? renderMeetingTicket(ui.meeting) : "";
+  const meetingList = renderMeetingList(ui);
+  const isBookingPreview = ui.type === "booking_preview";
+  const isCancelPreview = ui.type === "cancel_preview";
+  const actionToken = ui.action?.token || "";
+  const actions = isBookingPreview || isCancelPreview
+    ? `
+      <div class="meeting-ui-actions">
+        <button class="meeting-primary-action meeting-action-confirm" type="button" data-operation="${isCancelPreview ? "cancel" : "book"}" data-token="${escapeAttribute(actionToken)}">
+          ${escapeHtml(ui.action?.label || (isCancelPreview ? "确认取消" : "确认预定"))}
+        </button>
+        <button class="meeting-secondary-action ${isCancelPreview ? "meeting-action-dismiss" : "meeting-action-modify"}" type="button">
+          ${isCancelPreview ? "保留会议" : "修改信息"}
+        </button>
+      </div>
+    `
+    : "";
+
+  return `
+    <section class="meeting-ui meeting-ui--${status}" data-meeting-ui="${escapeAttribute(ui.type)}">
+      <header class="meeting-ui-header">
+        <span class="meeting-ui-icon"><i data-lucide="${escapeAttribute(icon)}"></i></span>
+        <span class="meeting-ui-heading"><small>${escapeHtml(eyebrow)}</small><strong>${escapeHtml(ui.title || "会议助手")}</strong></span>
+        ${statusNote ? `<span class="meeting-ui-status-note">${escapeHtml(statusNote)}</span>` : ""}
+      </header>
+      <div class="meeting-ui-body">
+        ${ui.message ? `<p class="meeting-ui-message">${escapeHtml(ui.message)}</p>` : ""}
+        ${mainMeeting}
+        ${meetingList}
+        ${issues}
+        ${suggestions}
+        ${actions}
+      </div>
+    </section>
+  `;
+}
+
 function renderAssistant() {
   const config = window.IntelligenceHubConfig || {};
   const title = config.assistantTitle || "智能问答";
@@ -327,6 +488,7 @@ function renderAssistant() {
   const attachPool = document.getElementById("assistantAttachmentPool");
   
   let uploadedFiles = [];
+  let pendingMeetingAction = null;
 
   if (!inputEl || !sendBtn || !messagesEl) return;
   
@@ -405,6 +567,121 @@ function renderAssistant() {
     }
     messagesEl.scrollTop = messagesEl.scrollHeight;
     return contentDiv;
+  };
+
+  const lockMeetingCard = (root, label = "已处理") => {
+    if (!root) return;
+    root.classList.add("meeting-ui--resolved");
+    root.querySelectorAll("button").forEach((button) => {
+      button.disabled = true;
+    });
+    const primary = root.querySelector(".meeting-primary-action");
+    if (primary) primary.textContent = label;
+  };
+
+  const bindMeetingUiActions = (contentDiv, ui) => {
+    const root = contentDiv.querySelector(".meeting-ui");
+    if (!root) return;
+
+    if ((ui.type === "booking_preview" || ui.type === "cancel_preview") && ui.action?.token) {
+      pendingMeetingAction = {
+        operation: ui.type === "cancel_preview" ? "cancel" : "book",
+        token: ui.action.token,
+        root,
+      };
+    } else if (["booking_success", "cancel_success", "booking_conflict", "confirmation_error"].includes(ui.type)) {
+      pendingMeetingAction = null;
+    }
+
+    root.querySelectorAll(".meeting-action-confirm").forEach((button) => {
+      button.addEventListener("click", () => {
+        if (button.disabled) return;
+        const operation = button.dataset.operation === "cancel" ? "cancel" : "book";
+        const token = button.dataset.token || "";
+        const label = operation === "cancel" ? "确认取消" : "确认预定";
+        lockMeetingCard(root, "正在确认...");
+        pendingMeetingAction = null;
+        sendMessage({
+          queryText: `${label}\n[meeting_confirmation_token:${token}]`,
+          displayText: label,
+        });
+      });
+    });
+
+    root.querySelectorAll(".meeting-action-dismiss").forEach((button) => {
+      button.addEventListener("click", () => {
+        if (button.disabled) return;
+        lockMeetingCard(root, "已保留会议");
+        pendingMeetingAction = null;
+        appendMessage("user", "保留会议");
+      });
+    });
+
+    root.querySelectorAll(".meeting-action-modify").forEach((button) => {
+      button.addEventListener("click", () => {
+        const title = ui.meeting?.title ? `「${ui.meeting.title}」` : "这场会议";
+        inputEl.value = `请把${title}修改为：`;
+        inputEl.dispatchEvent(new Event("input"));
+        inputEl.focus();
+      });
+    });
+
+    root.querySelectorAll(".meeting-action-preview-cancel").forEach((button) => {
+      button.addEventListener("click", () => {
+        if (button.disabled) return;
+        const meeting = (ui.meetings || []).find((item) => item.id === button.dataset.meetingId);
+        const token = button.dataset.token || meeting?.actionToken || "";
+        if (!meeting || !token) return;
+        appendMessage("user", "取消这场会议");
+        const previewDiv = appendMessage("system", "");
+        const previewUi = {
+          schema: "chency.meeting.v1",
+          type: "cancel_preview",
+          status: "danger",
+          title: "确认取消会议",
+          message: "确认后将释放该会议室。",
+          meeting,
+          meetings: [],
+          suggestions: [],
+          issues: [],
+          action: { kind: "confirm_cancel", label: "确认取消", token },
+          meta: {},
+        };
+        previewDiv.classList.add("has-meeting-ui");
+        previewDiv.innerHTML = renderMeetingUi(previewUi);
+        bindMeetingUiActions(previewDiv, previewUi);
+        if (window.lucide) window.lucide.createIcons();
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      });
+    });
+
+    root.querySelectorAll(".meeting-suggestion").forEach((button) => {
+      button.addEventListener("click", () => {
+        const title = ui.meeting?.title ? `「${ui.meeting.title}」` : "这场会议";
+        const date = button.dataset.date ? `${button.dataset.date} ` : "";
+        inputEl.value = `把${title}改到 ${date}${button.dataset.start}-${button.dataset.end}`;
+        inputEl.dispatchEvent(new Event("input"));
+        inputEl.focus();
+      });
+    });
+  };
+
+  const renderSystemReply = (contentDiv, text, complete = false) => {
+    const parsed = parseMeetingUiReply(text);
+    if (complete && parsed.ui) {
+      contentDiv.parentElement?.classList.add("assistant-message-meeting");
+      contentDiv.classList.add("has-meeting-ui");
+      contentDiv.innerHTML = renderMeetingUi(parsed.ui);
+      bindMeetingUiActions(contentDiv, parsed.ui);
+      if (window.lucide) window.lucide.createIcons();
+      return;
+    }
+    contentDiv.parentElement?.classList.remove("assistant-message-meeting");
+    contentDiv.classList.remove("has-meeting-ui");
+    const visibleText = parsed.cleanText || (complete ? text : "");
+    contentDiv.innerHTML = window.DOMPurify
+      ? window.DOMPurify.sanitize(window.marked.parse(visibleText || ""))
+      : escapeHtml(visibleText || "");
   };
 
   // 语音输入：录音 -> /api/chat/audio (Dify audio-to-text) -> 填入输入框
@@ -522,8 +799,28 @@ function renderAssistant() {
     micBtn.style.display = "none"; // 浏览器不支持录音 API，隐藏按钮
   }
 
-  const sendMessage = async () => {
-    let text = inputEl.value.trim();
+  const sendMessage = async (options = {}) => {
+    const typedText = inputEl.value.trim();
+    let text = options.queryText !== undefined ? options.queryText : typedText;
+    let displayText = options.displayText !== undefined ? options.displayText : typedText;
+
+    if (options.queryText === undefined && pendingMeetingAction && /^(确认|确认预定|确认取消|确定|可以|没问题)[。！!\s]*$/.test(typedText)) {
+      const label = pendingMeetingAction.operation === "cancel" ? "确认取消" : "确认预定";
+      text = `${label}\n[meeting_confirmation_token:${pendingMeetingAction.token}]`;
+      displayText = typedText || label;
+      lockMeetingCard(pendingMeetingAction.root, "正在确认...");
+      pendingMeetingAction = null;
+    } else if (options.queryText === undefined && pendingMeetingAction && /^(不取消|保留|算了|暂不|放弃)[。！!\s]*$/.test(typedText)) {
+      lockMeetingCard(pendingMeetingAction.root, "已保留会议");
+      pendingMeetingAction = null;
+      inputEl.value = "";
+      appendMessage("user", escapeHtml(typedText));
+      inputEl.focus();
+      return;
+    } else if (options.queryText === undefined && pendingMeetingAction && typedText) {
+      pendingMeetingAction = null;
+    }
+
     if (!text && uploadedFiles.length === 0) return;
     
     inputEl.value = "";
@@ -535,7 +832,7 @@ function renderAssistant() {
       upload_file_id: f.upload_file_id
     }));
     
-    let userMessageHTML = escapeHtml(text);
+    let userMessageHTML = escapeHtml(displayText);
     if (uploadedFiles.length > 0) {
       const fileNames = uploadedFiles.map(f => `<span style="display:inline-flex;align-items:center;background:#ffffff;color:#1e293b;border-radius:4px;padding:2px 6px;font-size:12px;margin:2px 4px 2px 0;"><i data-lucide="${f.type === 'image' ? 'image' : 'file-text'}" style="width:14px;height:14px;margin-right:4px;"></i>${escapeHtml(f.name)}</span>`).join("");
       userMessageHTML = `<div style="margin-bottom:6px;">${fileNames}</div>` + userMessageHTML;
@@ -593,7 +890,7 @@ function renderAssistant() {
               if (data.event === "message" || data.event === "agent_message") {
                 if (fullReply === "") replyContentDiv.innerHTML = "";
                 fullReply += data.answer || "";
-                replyContentDiv.innerHTML = window.DOMPurify.sanitize(window.marked.parse(fullReply));
+                renderSystemReply(replyContentDiv, fullReply, false);
                 messagesEl.scrollTop = messagesEl.scrollHeight;
               } else if (data.event === "message_end" || data.event === "agent_message_end") {
                 if (data.conversation_id) {
@@ -604,6 +901,9 @@ function renderAssistant() {
           }
         }
       }
+
+      renderSystemReply(replyContentDiv, fullReply, true);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
 
       // 合规回执后追加「确认报销 / 放弃」按钮
       if (/初步校验通过/.test(fullReply)) {
