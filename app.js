@@ -54,7 +54,9 @@ const searchInput = document.querySelector("#globalSearch");
 const assistantToggle = document.querySelector("#assistantToggle");
 const assistantClose = document.querySelector("#assistantClose");
 const assistantPanel = document.querySelector("#assistantPanel");
+const assistantResizeHandle = document.querySelector("#assistantResizeHandle");
 const adminEntry = document.querySelector("#adminEntry");
+const ASSISTANT_SIZE_STORAGE_KEY = "intelligence-hub.assistant-size.v1";
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) => ({
@@ -148,6 +150,7 @@ async function bootstrap() {
   renderNavigation();
   renderCatalog();
   renderAssistant();
+  initAssistantResize();
   initPhotoViewer();
   registerServiceWorker();
   trackEvent("pageview");
@@ -1397,6 +1400,112 @@ function setAssistantOpen(isOpen) {
   assistantToggle.setAttribute("aria-expanded", String(isOpen));
   const assistantTitle = (window.IntelligenceHubConfig || {}).assistantTitle || "智能问答";
   assistantToggle.setAttribute("aria-label", (isOpen ? "关闭" : "打开") + assistantTitle);
+}
+
+function initAssistantResize() {
+  if (!assistantPanel || !assistantResizeHandle) return;
+
+  const desktopLayout = window.matchMedia("(min-width: 861px)");
+  const minWidth = 360;
+  const minHeight = 480;
+  let dragState = null;
+
+  const getLimits = () => ({
+    maxWidth: Math.max(minWidth, window.innerWidth - 48),
+    maxHeight: Math.max(minHeight, window.innerHeight - 120),
+  });
+
+  const clamp = (value, min, max) => Math.min(max, Math.max(min, Math.round(value)));
+
+  const applySize = (width, height, persist = false) => {
+    if (!desktopLayout.matches) return;
+    const { maxWidth, maxHeight } = getLimits();
+    const nextWidth = clamp(width, minWidth, maxWidth);
+    const nextHeight = clamp(height, minHeight, maxHeight);
+    assistantPanel.style.width = `${nextWidth}px`;
+    assistantPanel.style.height = `${nextHeight}px`;
+    assistantResizeHandle.setAttribute("aria-label", `当前窗口宽 ${nextWidth} 像素、高 ${nextHeight} 像素；拖动或使用方向键调整`);
+    if (persist) {
+      try {
+        localStorage.setItem(ASSISTANT_SIZE_STORAGE_KEY, JSON.stringify({ width: nextWidth, height: nextHeight }));
+      } catch (error) {
+        console.warn("[Assistant] window size save failed", error);
+      }
+    }
+  };
+
+  const restoreSize = () => {
+    if (!desktopLayout.matches) return;
+    try {
+      const stored = JSON.parse(localStorage.getItem(ASSISTANT_SIZE_STORAGE_KEY) || "null");
+      if (Number.isFinite(stored?.width) && Number.isFinite(stored?.height)) {
+        applySize(stored.width, stored.height);
+      }
+    } catch (error) {
+      console.warn("[Assistant] window size restore failed", error);
+    }
+  };
+
+  const finishDrag = (event) => {
+    if (!dragState || event.pointerId !== dragState.pointerId) return;
+    const rect = assistantPanel.getBoundingClientRect();
+    dragState = null;
+    assistantPanel.classList.remove("is-resizing");
+    if (assistantResizeHandle.hasPointerCapture(event.pointerId)) {
+      assistantResizeHandle.releasePointerCapture(event.pointerId);
+    }
+    applySize(rect.width, rect.height, true);
+  };
+
+  assistantResizeHandle.addEventListener("pointerdown", (event) => {
+    if (!desktopLayout.matches || event.button !== 0 || !event.isPrimary) return;
+    const rect = assistantPanel.getBoundingClientRect();
+    dragState = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      width: rect.width,
+      height: rect.height,
+    };
+    assistantPanel.classList.add("is-resizing");
+    assistantResizeHandle.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  });
+
+  assistantResizeHandle.addEventListener("pointermove", (event) => {
+    if (!dragState || event.pointerId !== dragState.pointerId) return;
+    applySize(
+      dragState.width - (event.clientX - dragState.startX),
+      dragState.height - (event.clientY - dragState.startY),
+    );
+  });
+  assistantResizeHandle.addEventListener("pointerup", finishDrag);
+  assistantResizeHandle.addEventListener("pointercancel", finishDrag);
+
+  assistantResizeHandle.addEventListener("keydown", (event) => {
+    const direction = {
+      ArrowLeft: [1, 0],
+      ArrowRight: [-1, 0],
+      ArrowUp: [0, 1],
+      ArrowDown: [0, -1],
+    }[event.key];
+    if (!direction || !desktopLayout.matches) return;
+    const step = event.shiftKey ? 64 : 24;
+    const rect = assistantPanel.getBoundingClientRect();
+    applySize(rect.width + direction[0] * step, rect.height + direction[1] * step, true);
+    event.preventDefault();
+  });
+
+  window.addEventListener("resize", () => {
+    if (!desktopLayout.matches) return;
+    const rect = assistantPanel.getBoundingClientRect();
+    applySize(rect.width, rect.height);
+  });
+  desktopLayout.addEventListener("change", (event) => {
+    if (event.matches) restoreSize();
+  });
+
+  restoreSize();
 }
 
 function registerServiceWorker() {
