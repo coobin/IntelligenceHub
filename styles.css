@@ -473,7 +473,8 @@ h1 {
 }
 
 .assistant-fab:focus-visible,
-.assistant-close:focus-visible {
+.assistant-close:focus-visible,
+.assistant-clear:focus-visible {
   outline: 3px solid rgba(37, 99, 235, 0.28);
   outline-offset: 3px;
 }
@@ -529,6 +530,62 @@ h1 {
 .floating-close:hover {
   background: rgba(0, 0, 0, 0.1);
   color: var(--accent);
+}
+
+.assistant-history-toolbar {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.assistant-history-state,
+.assistant-clear {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.assistant-history-state {
+  padding: 0 9px;
+  color: #64748b;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(203, 213, 225, 0.78);
+  backdrop-filter: blur(8px);
+}
+
+.assistant-history-state svg,
+.assistant-clear svg {
+  width: 13px;
+  height: 13px;
+}
+
+.assistant-clear {
+  padding: 0 9px;
+  border: 1px solid transparent;
+  color: #64748b;
+  background: rgba(241, 245, 249, 0.92);
+  cursor: pointer;
+  transition: color 140ms ease, background 140ms ease, border-color 140ms ease;
+}
+
+.assistant-clear:hover:not(:disabled) {
+  color: #b42318;
+  background: #fff5f4;
+  border-color: #fecaca;
+}
+
+.assistant-clear:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 .assistant-chat-container {

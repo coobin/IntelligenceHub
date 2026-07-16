@@ -13,11 +13,11 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./assets/icons/icon-192.png" type="image/png" />
     <link rel="apple-touch-icon" href="./assets/icons/apple-touch-icon.png" />
-    <link rel="stylesheet" href="./styles.css?v=20260716_02" />
+    <link rel="stylesheet" href="./styles.css?v=20260716_03" />
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://unpkg.com/marked@12.0.0/marked.min.js"></script>
     <script src="https://unpkg.com/dompurify@3.0.9/dist/purify.min.js"></script>
-    <script type="module" src="./app.js?v=20260716_02"></script>
+    <script type="module" src="./app.js?v=20260716_03"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -67,6 +67,12 @@
         <input type="file" id="nativeInvoiceUpload" accept="image/*,application/pdf" multiple style="display:none" />
         
         <button class="assistant-close floating-close" id="assistantClose" type="button" aria-label="关闭问答">×</button>
+        <div class="assistant-history-toolbar" aria-label="对话记录">
+          <span class="assistant-history-state"><i data-lucide="history"></i>本机保存</span>
+          <button class="assistant-clear" id="assistantClear" type="button" aria-label="清空对话" title="清空本机保存的对话">
+            <i data-lucide="trash-2"></i><span>清空</span>
+          </button>
+        </div>
         <div class="assistant-chat-container">
           <div class="assistant-messages" id="assistantMessages">
             <div class="assistant-message assistant-message-system">

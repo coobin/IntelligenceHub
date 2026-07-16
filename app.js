@@ -314,6 +314,10 @@ function renderCard(item) {
 
 let chatConversationId = "";
 
+const CHAT_HISTORY_STORAGE_PREFIX = "intelligence-hub.chat.v1";
+const CHAT_HISTORY_MAX_MESSAGES = 80;
+const CHAT_HISTORY_MAX_CHARS = 600000;
+
 const MEETING_UI_START = "[CHENCY_MEETING_UI]";
 const MEETING_UI_END = "[/CHENCY_MEETING_UI]";
 
@@ -486,11 +490,56 @@ function renderAssistant() {
   const attachBtn = document.getElementById("difyAttachmentBtn");
   const attachInput = document.getElementById("difyAttachmentInput");
   const attachPool = document.getElementById("assistantAttachmentPool");
+  const clearBtn = document.getElementById("assistantClear");
   
   let uploadedFiles = [];
   let pendingMeetingAction = null;
+  let chatHistory = [];
 
   if (!inputEl || !sendBtn || !messagesEl) return;
+
+  const historyKey = `${CHAT_HISTORY_STORAGE_PREFIX}:${encodeURIComponent(state.user || "anonymous")}`;
+  const welcomeText = messagesEl.querySelector(".assistant-message-system .assistant-message-content")?.textContent?.trim()
+    || `你好！我是${config.assistantName || "AI 助手"}，有什么我可以帮您的吗？`;
+
+  const updateClearState = () => {
+    if (clearBtn) clearBtn.disabled = chatHistory.length === 0 && !chatConversationId;
+  };
+
+  const persistHistory = () => {
+    updateClearState();
+    try {
+      localStorage.setItem(historyKey, JSON.stringify({
+        version: 1,
+        conversationId: chatConversationId,
+        messages: chatHistory,
+        savedAt: Date.now(),
+      }));
+    } catch (error) {
+      console.warn("[Assistant History] save failed", error);
+    }
+  };
+
+  const rememberMessage = (role, text) => {
+    const value = String(text || "").trim();
+    if (!value || !["user", "system"].includes(role)) return;
+    chatHistory.push({ role, text: value });
+    chatHistory = chatHistory.slice(-CHAT_HISTORY_MAX_MESSAGES);
+    while (chatHistory.length > 1 && chatHistory.reduce((sum, item) => sum + item.text.length, 0) > CHAT_HISTORY_MAX_CHARS) {
+      chatHistory.shift();
+    }
+    persistHistory();
+  };
+
+  const resetMessages = () => {
+    messagesEl.innerHTML = `
+      <div class="assistant-message assistant-message-system">
+        <div class="assistant-message-content">${escapeHtml(welcomeText)}</div>
+      </div>
+    `;
+    messagesEl.scrollTop = 0;
+    if (window.lucide) window.lucide.createIcons();
+  };
   
   if (attachBtn && attachInput && attachPool) {
     attachBtn.addEventListener("click", () => attachInput.click());
@@ -552,7 +601,7 @@ function renderAssistant() {
     });
   }
   
-  const appendMessage = (role, text) => {
+  const appendMessage = (role, text, options = {}) => {
     const msgDiv = document.createElement("div");
     msgDiv.className = `assistant-message assistant-message-${role}`;
     const contentDiv = document.createElement("div");
@@ -564,6 +613,9 @@ function renderAssistant() {
       contentDiv.innerHTML = window.DOMPurify ? window.DOMPurify.sanitize(window.marked.parse(text || "")) : text;
     } else {
       contentDiv.innerHTML = text; // allow HTML for user if it's our own formatting (like attachment chips)
+    }
+    if (!options.skipHistory) {
+      rememberMessage(role, options.historyText !== undefined ? options.historyText : contentDiv.textContent);
     }
     messagesEl.scrollTop = messagesEl.scrollHeight;
     return contentDiv;
@@ -634,7 +686,7 @@ function renderAssistant() {
         const token = button.dataset.token || meeting?.actionToken || "";
         if (!meeting || !token) return;
         appendMessage("user", "取消这场会议");
-        const previewDiv = appendMessage("system", "");
+        const previewDiv = appendMessage("system", "", { skipHistory: true });
         const previewUi = {
           schema: "chency.meeting.v1",
           type: "cancel_preview",
@@ -651,6 +703,7 @@ function renderAssistant() {
         previewDiv.classList.add("has-meeting-ui");
         previewDiv.innerHTML = renderMeetingUi(previewUi);
         bindMeetingUiActions(previewDiv, previewUi);
+        rememberMessage("system", `${previewUi.message}\n\n${MEETING_UI_START}${JSON.stringify(previewUi)}${MEETING_UI_END}`);
         if (window.lucide) window.lucide.createIcons();
         messagesEl.scrollTop = messagesEl.scrollHeight;
       });
@@ -684,6 +737,69 @@ function renderAssistant() {
       ? window.DOMPurify.sanitize(window.marked.parse(visibleText || ""))
       : escapeHtml(visibleText || "");
   };
+
+  const restoreHistory = () => {
+    let stored;
+    try {
+      stored = JSON.parse(localStorage.getItem(historyKey) || "null");
+    } catch (error) {
+      console.warn("[Assistant History] invalid history", error);
+      try { localStorage.removeItem(historyKey); } catch (storageError) {}
+      updateClearState();
+      return;
+    }
+
+    const storedMessages = Array.isArray(stored?.messages)
+      ? stored.messages
+        .filter((item) => item && ["user", "system"].includes(item.role) && typeof item.text === "string")
+        .slice(-CHAT_HISTORY_MAX_MESSAGES)
+      : [];
+    if (!storedMessages.length) {
+      chatConversationId = "";
+      updateClearState();
+      return;
+    }
+
+    chatConversationId = typeof stored.conversationId === "string" ? stored.conversationId : "";
+    chatHistory = storedMessages;
+    messagesEl.innerHTML = "";
+
+    storedMessages.forEach((item) => {
+      if (item.role === "system") {
+        const contentDiv = appendMessage("system", "", { skipHistory: true });
+        renderSystemReply(contentDiv, item.text, true);
+      } else {
+        appendMessage("user", escapeHtml(item.text).replace(/\n/g, "<br>"), { skipHistory: true });
+        if (pendingMeetingAction && /^(确认|确认预定|确认取消|保留会议|不取消|算了|暂不|放弃)[。！!\s]*$/.test(item.text.trim())) {
+          lockMeetingCard(pendingMeetingAction.root, /^(保留会议|不取消|算了|暂不|放弃)/.test(item.text.trim()) ? "已保留会议" : "已处理");
+          pendingMeetingAction = null;
+        }
+      }
+    });
+
+    messagesEl.querySelectorAll('[data-meeting-ui="booking_preview"], [data-meeting-ui="cancel_preview"]').forEach((root) => {
+      if (pendingMeetingAction?.root !== root) lockMeetingCard(root, "已处理");
+    });
+    updateClearState();
+    if (window.lucide) window.lucide.createIcons();
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  };
+
+  restoreHistory();
+
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => {
+      if (clearBtn.disabled) return;
+      if (!window.confirm("清空当前浏览器中保存的对话记录？此操作不会删除已经预定的会议或提交的报销。")) return;
+      try { localStorage.removeItem(historyKey); } catch (storageError) {}
+      chatHistory = [];
+      chatConversationId = "";
+      pendingMeetingAction = null;
+      resetMessages();
+      updateClearState();
+      inputEl.focus();
+    });
+  }
 
   // 语音输入：录音 -> /api/chat/audio (Dify audio-to-text) -> 填入输入框
   const micBtn = document.getElementById("assistantMicBtn");
@@ -853,7 +969,7 @@ function renderAssistant() {
     uploadedFiles = [];
     if (attachPool) attachPool.style.display = "none";
     
-    const replyContentDiv = appendMessage("system", "正在思考...");
+    const replyContentDiv = appendMessage("system", "正在思考...", { skipHistory: true });
     sendBtn.disabled = true;
     
     try {
@@ -911,6 +1027,7 @@ function renderAssistant() {
       }
 
       renderSystemReply(replyContentDiv, fullReply, true);
+      rememberMessage("system", fullReply);
       messagesEl.scrollTop = messagesEl.scrollHeight;
 
       // 合规回执后追加「确认报销 / 放弃」按钮
@@ -942,7 +1059,7 @@ function renderAssistant() {
           lockBoth();
           rbtn.textContent = "已放弃";
           appendMessage("user", "放弃");
-          const sysDiv = appendMessage("system", "正在处理...");
+          const sysDiv = appendMessage("system", "正在处理...", { skipHistory: true });
           try {
             const r = await fetch("/invoice-proxy/api/invoices/dify/reject-latest", {
               method: "POST",
@@ -951,8 +1068,10 @@ function renderAssistant() {
             });
             const d = await r.json();
             sysDiv.textContent = d.message || "已放弃本次报销。";
+            rememberMessage("system", sysDiv.textContent);
           } catch (e) {
             sysDiv.textContent = "操作失败，请稍后再试。";
+            rememberMessage("system", sysDiv.textContent);
           }
           messagesEl.scrollTop = messagesEl.scrollHeight;
         });
@@ -963,6 +1082,7 @@ function renderAssistant() {
       }
     } catch (err) {
       replyContentDiv.textContent = "抱歉，请求出错，请稍后再试。";
+      rememberMessage("system", replyContentDiv.textContent);
     } finally {
       sendBtn.disabled = false;
       inputEl.focus();
