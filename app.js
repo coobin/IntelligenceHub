@@ -494,6 +494,8 @@ function renderAssistant() {
   
   let uploadedFiles = [];
   let pendingMeetingAction = null;
+  let pendingMeetingContinuation = null;
+  let latestRequestText = "";
   let chatHistory = [];
 
   if (!inputEl || !sendBtn || !messagesEl) return;
@@ -512,6 +514,7 @@ function renderAssistant() {
       localStorage.setItem(historyKey, JSON.stringify({
         version: 1,
         conversationId: chatConversationId,
+        meetingContinuation: pendingMeetingContinuation,
         messages: chatHistory,
         savedAt: Date.now(),
       }));
@@ -723,6 +726,14 @@ function renderAssistant() {
   const renderSystemReply = (contentDiv, text, complete = false) => {
     const parsed = parseMeetingUiReply(text);
     if (complete && parsed.ui) {
+      if (parsed.ui.type === "booking_needs_info" && latestRequestText) {
+        pendingMeetingContinuation = {
+          operation: "book",
+          query: latestRequestText,
+        };
+      } else if (parsed.ui.type !== "booking_needs_info") {
+        pendingMeetingContinuation = null;
+      }
       contentDiv.parentElement?.classList.add("assistant-message-meeting");
       contentDiv.classList.add("has-meeting-ui");
       contentDiv.innerHTML = renderMeetingUi(parsed.ui);
@@ -763,12 +774,21 @@ function renderAssistant() {
     chatConversationId = typeof stored.conversationId === "string" ? stored.conversationId : "";
     chatHistory = storedMessages;
     messagesEl.innerHTML = "";
+    let lastRestoredUserText = "";
+    let inferredMeetingContinuation = null;
 
     storedMessages.forEach((item) => {
       if (item.role === "system") {
+        const restoredMeetingUi = parseMeetingUiReply(item.text).ui;
+        if (restoredMeetingUi?.type === "booking_needs_info" && lastRestoredUserText) {
+          inferredMeetingContinuation = { operation: "book", query: lastRestoredUserText };
+        } else if (restoredMeetingUi) {
+          inferredMeetingContinuation = null;
+        }
         const contentDiv = appendMessage("system", "", { skipHistory: true });
         renderSystemReply(contentDiv, item.text, true);
       } else {
+        lastRestoredUserText = item.text.trim();
         appendMessage("user", escapeHtml(item.text).replace(/\n/g, "<br>"), { skipHistory: true });
         if (pendingMeetingAction && /^(确认|确认预定|确认取消|保留会议|不取消|算了|暂不|放弃)[。！!\s]*$/.test(item.text.trim())) {
           lockMeetingCard(pendingMeetingAction.root, /^(保留会议|不取消|算了|暂不|放弃)/.test(item.text.trim()) ? "已保留会议" : "已处理");
@@ -780,6 +800,11 @@ function renderAssistant() {
     messagesEl.querySelectorAll('[data-meeting-ui="booking_preview"], [data-meeting-ui="cancel_preview"]').forEach((root) => {
       if (pendingMeetingAction?.root !== root) lockMeetingCard(root, "已处理");
     });
+    pendingMeetingContinuation = stored?.meetingContinuation?.operation === "book"
+      && typeof stored.meetingContinuation.query === "string"
+      && stored.meetingContinuation.query.trim()
+      ? { operation: "book", query: stored.meetingContinuation.query.trim() }
+      : inferredMeetingContinuation;
     updateClearState();
     if (window.lucide) window.lucide.createIcons();
     messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -795,6 +820,8 @@ function renderAssistant() {
       chatHistory = [];
       chatConversationId = "";
       pendingMeetingAction = null;
+      pendingMeetingContinuation = null;
+      latestRequestText = "";
       resetMessages();
       updateClearState();
       inputEl.focus();
@@ -942,7 +969,27 @@ function renderAssistant() {
       pendingMeetingAction = null;
     }
 
+    if (options.queryText === undefined && pendingMeetingContinuation && typedText) {
+      if (/^(算了|不用了|不订了|不预定了|取消预定|放弃)[。！!\s]*$/.test(typedText)) {
+        pendingMeetingContinuation = null;
+        inputEl.value = "";
+        appendMessage("user", escapeHtml(typedText));
+        appendMessage("system", "好的，已结束本次会议预定，不会创建会议。");
+        inputEl.focus();
+        return;
+      }
+
+      const startsNewIntent = /(预定|预约|安排|新建|订会议|开会|查询|查一下|查看|有哪些会议|我的会议|取消会议|退订|删除会议|报销|发票)/.test(typedText);
+      if (startsNewIntent) {
+        pendingMeetingContinuation = null;
+      } else {
+        text = `${pendingMeetingContinuation.query}\n补充信息：${typedText}`;
+      }
+    }
+
     if (!text && uploadedFiles.length === 0) return;
+
+    latestRequestText = text;
     
     inputEl.value = "";
     inputEl.style.height = "auto";
