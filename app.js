@@ -1008,6 +1008,9 @@ function renderAssistant() {
       // 导致附件没送到发票工具。界面气泡仍只显示文件名，不受影响。
       text = text ? `${text}（通讯费发票报销）` : "我要报销这张通讯费发票";
     }
+
+    let holdMeetingCardStream = Boolean(options.meetingAction)
+      || /(会议|会议室|日程|行程|预定|预订|预约|退订|开会|取消|\bD\d{2}\b)/i.test(text);
     
     appendMessage("user", userMessageHTML);
     if (window.lucide) window.lucide.createIcons();
@@ -1058,10 +1061,16 @@ function renderAssistant() {
             if (!dataStr || dataStr === "[DONE]") continue;
             try {
               const data = JSON.parse(dataStr);
+              if (data.event === "node_finished" && JSON.stringify(data.data?.outputs || {}).includes(MEETING_UI_START)) {
+                holdMeetingCardStream = true;
+                replyContentDiv.innerHTML = '<span class="assistant-typing" aria-label="思考中"><span class="assistant-typing-dot"></span><span class="assistant-typing-dot"></span><span class="assistant-typing-dot"></span></span>';
+              }
               if (data.event === "message" || data.event === "agent_message") {
-                if (fullReply === "") replyContentDiv.innerHTML = "";
+                if (fullReply === "" && !holdMeetingCardStream) replyContentDiv.innerHTML = "";
                 fullReply += data.answer || "";
-                renderSystemReply(replyContentDiv, fullReply, false);
+                if (!holdMeetingCardStream) {
+                  renderSystemReply(replyContentDiv, fullReply, false);
+                }
                 messagesEl.scrollTop = messagesEl.scrollHeight;
               } else if (data.event === "message_end" || data.event === "agent_message_end") {
                 if (data.conversation_id) {
