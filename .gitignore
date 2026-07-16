@@ -8,6 +8,7 @@ node_modules/
 config.local.js
 
 # Internal docs (not for the public repo)
+AGENTS.md
 CLAUDE.md
 
 # Claude Code local settings
