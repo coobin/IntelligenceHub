@@ -480,9 +480,28 @@ function meetingQueryDateRange(text, now = new Date()) {
     start = today;
     end = today;
     label = "今天";
+  } else if (
+    !/(历史|过去|以前|已结束)/.test(source)
+    && /(?:我的(?:会议|日程|行程)|(?:查询|查一下|查看|看看|有哪些|有什么).*(?:会议|日程|行程)|(?:会议|日程|行程).*(?:情况|安排|列表))/.test(source)
+  ) {
+    return {
+      start: isoLocalDate(today),
+      end: "9999-12-31",
+      label: "未来会议",
+      futureOnly: true,
+      cutoffMinutes: now.getHours() * 60 + now.getMinutes(),
+    };
   }
 
   return start && end ? { start: isoLocalDate(start), end: isoLocalDate(end), label } : null;
+}
+
+function meetingMatchesRange(meeting, range) {
+  if (!range || !meeting?.date || meeting.date < range.start || meeting.date > range.end) return Boolean(!range);
+  if (!range.futureOnly || meeting.date > range.start) return true;
+  const match = /^(\d{1,2}):(\d{2})$/.exec(String(meeting.start || ""));
+  if (!match) return true;
+  return Number(match[1]) * 60 + Number(match[2]) >= range.cutoffMinutes;
 }
 
 function selectMeetingUiCandidate(candidates, range) {
@@ -495,7 +514,7 @@ function selectMeetingUiCandidate(candidates, range) {
   const queryCandidates = valid.filter((ui) => ["query_results", "query_empty"].includes(ui.type));
 
   const countMeetings = (ui) => (Array.isArray(ui.meetings) ? ui.meetings : [])
-    .filter((meeting) => !range || (meeting?.date >= range.start && meeting?.date <= range.end))
+    .filter((meeting) => meetingMatchesRange(meeting, range))
     .length;
   let selected = queryCandidates[0];
   let selectedCount = countMeetings(selected);
@@ -512,9 +531,9 @@ function selectMeetingUiCandidate(candidates, range) {
 function filterMeetingUiByDateRange(ui, range) {
   if (!ui || !range || !["query_results", "query_empty"].includes(ui.type)) return ui;
   const meetings = (Array.isArray(ui.meetings) ? ui.meetings : [])
-    .filter((meeting) => meeting?.date >= range.start && meeting?.date <= range.end);
+    .filter((meeting) => meetingMatchesRange(meeting, range));
   const hasMeetings = meetings.length > 0;
-  const scope = `${range.start} 至 ${range.end}`;
+  const scope = range.futureOnly ? "当前时刻之后" : `${range.start} 至 ${range.end}`;
   return {
     ...ui,
     type: hasMeetings ? "query_results" : "query_empty",
@@ -524,7 +543,7 @@ function filterMeetingUiByDateRange(ui, range) {
       ? `已按${range.label}筛选，仅显示 ${scope} 的会议。`
       : `${scope} 没有查询到会议。`,
     meetings,
-    filters: { ...(ui.filters || {}), dateFrom: range.start, dateTo: range.end },
+    filters: { ...(ui.filters || {}), dateFrom: range.start, dateTo: range.end, futureOnly: Boolean(range.futureOnly) },
     meta: { ...(ui.meta || {}), count: meetings.length },
   };
 }
