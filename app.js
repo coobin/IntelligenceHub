@@ -674,7 +674,9 @@ function renderMeetingUi(ui) {
   const suggestions = Array.isArray(ui.suggestions) && ui.suggestions.length
     ? `<div class="meeting-suggestions"><span>可选时间</span><div>${ui.suggestions.map((slot) => `<button class="meeting-suggestion" type="button" data-date="${escapeAttribute(ui.meeting?.date || "")}" data-start="${escapeAttribute(slot.start)}" data-end="${escapeAttribute(slot.end)}">${escapeHtml(slot.start)}–${escapeHtml(slot.end)}</button>`).join("")}</div></div>`
     : "";
-  const mainMeeting = ui.meeting ? renderMeetingTicket(ui.meeting) : "";
+  const mainMeeting = ui.meeting && ui.type !== "booking_conflict"
+    ? renderMeetingTicket(ui.meeting)
+    : "";
   const meetingList = renderMeetingList(ui);
   const isBookingPreview = ui.type === "booking_preview";
   const isCancelPreview = ui.type === "cancel_preview";
