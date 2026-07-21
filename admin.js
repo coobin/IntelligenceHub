@@ -4,6 +4,14 @@ let topVisitorsExpanded = false;
 let recentVisitorsExpanded = false;
 let cachedTopVisitors = [];
 let cachedRecentVisitors = [];
+let cachedDailyVisits = {};
+let trendPeriod = "day";
+
+const TREND_PERIODS = {
+  day: { count: 7, rangeLabel: "近 7 日" },
+  week: { count: 8, rangeLabel: "近 8 周" },
+  month: { count: 6, rangeLabel: "近 6 个月" }
+};
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) => ({
@@ -86,6 +94,15 @@ document.getElementById("recentVisitorsToggle").addEventListener("click", () => 
   drawRecentVisitors();
 });
 
+document.querySelectorAll("[data-trend-period]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const nextPeriod = button.dataset.trendPeriod;
+    if (!TREND_PERIODS[nextPeriod] || nextPeriod === trendPeriod) return;
+    trendPeriod = nextPeriod;
+    drawTrend();
+  });
+});
+
 // 加载数据
 async function loadCatalog() {
   const res = await fetch("/api/catalog", { cache: "no-store" });
@@ -148,36 +165,109 @@ function renderStats(stats) {
 
   renderAllEntryClicks(stats.clicks || {});
   renderTopVisitors(stats.dailyUV);
-
-  // 渲染趋势 (最近 7 天)
-  const trendList = document.getElementById("trendList");
-  const days = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    days.push(d.toISOString().split("T")[0]);
-  }
-
-  const maxDaily = Math.max(...days.map(d => toNumber(stats.daily?.[d])), 1);
-
-  trendList.innerHTML = days.map(d => {
-    const val = toNumber(stats.daily?.[d]);
-    const height = (val / maxDaily) * 100;
-    const label = d.split("-").slice(1).join("/");
-    return `
-      <div style="flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%;">
-        <div style="flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center;">
-          <div style="width: 100%; max-width: 30px; height: ${height}%; background: var(--admin-accent); border-radius: 4px; position: relative;" title="${escapeAttribute(`${d}: ${val}`)}">
-            ${val > 0 ? `<span style="position: absolute; top: -20px; left: 50%; transform: translateX(-50%); font-size: 10px; color: #64748b;">${val}</span>` : ""}
-          </div>
-        </div>
-        <span style="font-size: 10px; color: #94a3b8; margin-top: 8px;">${label}</span>
-      </div>
-    `;
-  }).join("");
+  cachedDailyVisits = stats.daily || {};
+  drawTrend();
 
   cachedRecentVisitors = (stats.recent || []).slice(0, 20);
   drawRecentVisitors();
+}
+
+function toDateKey(date) {
+  return date.toISOString().split("T")[0];
+}
+
+function addUtcDays(date, amount) {
+  const result = new Date(date);
+  result.setUTCDate(result.getUTCDate() + amount);
+  return result;
+}
+
+function sumVisits(start, end) {
+  let total = 0;
+  for (let cursor = new Date(start); cursor <= end; cursor = addUtcDays(cursor, 1)) {
+    total += toNumber(cachedDailyVisits[toDateKey(cursor)]);
+  }
+  return total;
+}
+
+function getTrendBuckets(period) {
+  const config = TREND_PERIODS[period];
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  const buckets = [];
+
+  if (period === "day") {
+    for (let offset = config.count - 1; offset >= 0; offset--) {
+      const date = addUtcDays(today, -offset);
+      const key = toDateKey(date);
+      buckets.push({
+        label: key.slice(5).replace("-", "/"),
+        title: key,
+        value: toNumber(cachedDailyVisits[key])
+      });
+    }
+    return buckets;
+  }
+
+  if (period === "week") {
+    const currentWeekStart = addUtcDays(today, -((today.getUTCDay() + 6) % 7));
+    for (let offset = config.count - 1; offset >= 0; offset--) {
+      const start = addUtcDays(currentWeekStart, -offset * 7);
+      const end = addUtcDays(start, 6);
+      buckets.push({
+        label: `${start.getUTCMonth() + 1}/${start.getUTCDate()}`,
+        title: `${toDateKey(start)} 至 ${toDateKey(end)}`,
+        value: sumVisits(start, end)
+      });
+    }
+    return buckets;
+  }
+
+  const currentMonthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
+  for (let offset = config.count - 1; offset >= 0; offset--) {
+    const start = new Date(Date.UTC(
+      currentMonthStart.getUTCFullYear(),
+      currentMonthStart.getUTCMonth() - offset,
+      1
+    ));
+    const end = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0));
+    buckets.push({
+      label: `${start.getUTCFullYear()}/${String(start.getUTCMonth() + 1).padStart(2, "0")}`,
+      title: `${toDateKey(start)} 至 ${toDateKey(end)}`,
+      value: sumVisits(start, end)
+    });
+  }
+  return buckets;
+}
+
+function drawTrend() {
+  const trendList = document.getElementById("trendList");
+  const rangeLabel = document.getElementById("trendRangeLabel");
+  if (!trendList || !rangeLabel) return;
+
+  const buckets = getTrendBuckets(trendPeriod);
+  const maxValue = Math.max(...buckets.map((bucket) => bucket.value), 1);
+  rangeLabel.textContent = TREND_PERIODS[trendPeriod].rangeLabel;
+
+  document.querySelectorAll("[data-trend-period]").forEach((button) => {
+    const active = button.dataset.trendPeriod === trendPeriod;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+
+  trendList.innerHTML = buckets.map((bucket) => {
+    const height = (bucket.value / maxValue) * 100;
+    return `
+      <div class="trend-column">
+        <div class="trend-bar-area">
+          <div class="trend-bar${bucket.value > 0 ? " has-value" : ""}" style="height:${height}%;" title="${escapeAttribute(`${bucket.title}：${bucket.value} 次访问`)}">
+            ${bucket.value > 0 ? `<span class="trend-value">${bucket.value}</span>` : ""}
+          </div>
+        </div>
+        <span class="trend-label">${escapeHtml(bucket.label)}</span>
+      </div>
+    `;
+  }).join("");
 }
 
 function drawRecentVisitors() {

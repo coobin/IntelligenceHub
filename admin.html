@@ -230,6 +230,96 @@
         background: #dbeafe;
       }
 
+      .trend-period-switch {
+        display: inline-flex;
+        gap: 3px;
+        padding: 3px;
+        border: 1px solid #e2e8f0;
+        border-radius: 9px;
+        background: #f8fafc;
+      }
+
+      .trend-period-button {
+        min-width: 44px;
+        padding: 5px 9px;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: #64748b;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .trend-period-button:hover {
+        color: var(--admin-accent);
+      }
+
+      .trend-period-button.active {
+        background: white;
+        color: var(--admin-accent);
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+      }
+
+      .trend-period-button:focus-visible {
+        outline: 2px solid var(--admin-accent);
+        outline-offset: 2px;
+      }
+
+      .trend-list {
+        display: flex;
+        align-items: flex-end;
+        height: 200px;
+        gap: 12px;
+        padding-top: 20px;
+      }
+
+      .trend-column {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-width: 0;
+        height: 100%;
+      }
+
+      .trend-bar-area {
+        flex: 1;
+        width: 100%;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+      }
+
+      .trend-bar {
+        position: relative;
+        width: 100%;
+        max-width: 30px;
+        border-radius: 4px 4px 2px 2px;
+        background: var(--admin-accent);
+        transition: height 0.2s ease;
+      }
+
+      .trend-bar.has-value {
+        min-height: 4px;
+      }
+
+      .trend-value {
+        position: absolute;
+        top: -20px;
+        left: 50%;
+        transform: translateX(-50%);
+        color: #64748b;
+        font-size: 10px;
+      }
+
+      .trend-label {
+        margin-top: 8px;
+        color: #94a3b8;
+        font-size: 10px;
+        white-space: nowrap;
+      }
+
       .entry-click-panel {
         margin-top: 16px;
         padding-top: 16px;
@@ -383,8 +473,15 @@
               </div>
             </div>
             <div class="chart-container">
-              <h3 style="margin-bottom: 24px; font-size: 16px; color: #1e293b;">最近 7 日趋势</h3>
-              <div id="trendList" style="display: flex; align-items: flex-end; height: 200px; gap: 12px; padding-top: 20px;">
+              <div class="chart-title-row">
+                <h3>访问趋势 <span id="trendRangeLabel" style="color:#94a3b8;font-size:12px;font-weight:500;">近 7 日</span></h3>
+                <div class="trend-period-switch" role="group" aria-label="访问趋势统计周期">
+                  <button class="trend-period-button active" type="button" data-trend-period="day" aria-pressed="true">按日</button>
+                  <button class="trend-period-button" type="button" data-trend-period="week" aria-pressed="false">按周</button>
+                  <button class="trend-period-button" type="button" data-trend-period="month" aria-pressed="false">按月</button>
+                </div>
+              </div>
+              <div id="trendList" class="trend-list">
                 <!-- 动态加载柱状图 -->
               </div>
             </div>
@@ -507,6 +604,6 @@
       </div>
     </div>
 
-    <script src="admin.js?v=20260707_04"></script>
+    <script src="admin.js?v=20260721_01"></script>
   </body>
 </html>
