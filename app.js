@@ -325,6 +325,14 @@ const MEETING_UI_START = "[CHENCY_MEETING_UI]";
 const MEETING_UI_END = "[/CHENCY_MEETING_UI]";
 const EXPENSE_UI_START = "[CHENCY_EXPENSE_UI]";
 const EXPENSE_UI_END = "[/CHENCY_EXPENSE_UI]";
+const PENDING_BOOKING_UI_TYPES = new Set(["booking_needs_info", "booking_conflict"]);
+
+function startsNewIntentDuringPendingBooking(text) {
+  const value = String(text || "").trim();
+  const switchesOperation = /(查询|查一下|查看|有哪些会议|我的会议|取消会议|退订|删除会议|报销|发票)/.test(value);
+  const startsSeparateBooking = /(?:另外|另行|再|重新|新建|新增|另一个|第二个|新的一场).{0,12}(?:预定|预订|预约|安排|订会议|开会|会议室)/.test(value);
+  return switchesOperation || startsSeparateBooking;
+}
 
 function parseMeetingUiReply(text) {
   const source = String(text || "");
@@ -1000,12 +1008,12 @@ function renderAssistant() {
       return;
     }
     if (complete && meetingParsed.ui) {
-      if (meetingParsed.ui.type === "booking_needs_info" && latestRequestText) {
+      if (PENDING_BOOKING_UI_TYPES.has(meetingParsed.ui.type) && latestRequestText) {
         pendingMeetingContinuation = {
           operation: "book",
           query: latestRequestText,
         };
-      } else if (meetingParsed.ui.type !== "booking_needs_info") {
+      } else if (!PENDING_BOOKING_UI_TYPES.has(meetingParsed.ui.type)) {
         pendingMeetingContinuation = null;
       }
       contentDiv.parentElement?.classList.remove("assistant-message-expense");
@@ -1058,7 +1066,7 @@ function renderAssistant() {
     storedMessages.forEach((item) => {
       if (item.role === "system") {
         const restoredMeetingUi = parseMeetingUiReply(item.text).ui;
-        if (restoredMeetingUi?.type === "booking_needs_info" && lastRestoredUserText) {
+        if (PENDING_BOOKING_UI_TYPES.has(restoredMeetingUi?.type) && lastRestoredUserText) {
           inferredMeetingContinuation = { operation: "book", query: lastRestoredUserText };
         } else if (restoredMeetingUi) {
           inferredMeetingContinuation = null;
@@ -1257,8 +1265,7 @@ function renderAssistant() {
         return;
       }
 
-      const startsNewIntent = /(预定|预约|安排|新建|订会议|开会|查询|查一下|查看|有哪些会议|我的会议|取消会议|退订|删除会议|报销|发票)/.test(typedText);
-      if (startsNewIntent) {
+      if (startsNewIntentDuringPendingBooking(typedText)) {
         pendingMeetingContinuation = null;
       } else {
         text = `${pendingMeetingContinuation.query}\n补充信息：${typedText}`;
