@@ -13,11 +13,11 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./assets/icons/icon-192.png" type="image/png" />
     <link rel="apple-touch-icon" href="./assets/icons/apple-touch-icon.png" />
-    <link rel="stylesheet" href="./styles.css?v=20260721_03" />
+    <link rel="stylesheet" href="./styles.css?v=20260722_01" />
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://unpkg.com/marked@12.0.0/marked.min.js"></script>
     <script src="https://unpkg.com/dompurify@3.0.9/dist/purify.min.js"></script>
-    <script type="module" src="./app.js?v=20260721_03"></script>
+    <script type="module" src="./app.js?v=20260722_01"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -47,13 +47,23 @@
             <p class="eyebrow">Enterprise Navigation</p>
             <h1>Intelligence Hub</h1>
           </div>
-          <form class="search-bar" action="https://www.bing.com/search" method="GET" target="_blank">
-            <input name="q" id="globalSearch" type="search" placeholder="在 Bing 中搜索..." autocomplete="off" />
-            <button type="submit" aria-label="搜索">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-            </button>
-          </form>
         </header>
+
+        <section class="assistant-home" id="assistantHome" aria-label="犇犇助手对话区">
+          <div class="assistant-home-heading">
+            <div>
+              <p class="assistant-home-kicker">犇犇助手</p>
+              <h2>今天想让犇犇帮你做什么？</h2>
+            </div>
+            <p>查询会议、报销记录，或咨询公司制度。</p>
+          </div>
+          <div class="assistant-inline-mount" id="assistantInlineMount"></div>
+          <div class="assistant-quick-prompts" aria-label="常用提问">
+            <button type="button" data-assistant-prompt="查询我接下来一个星期的会议">查询我的会议</button>
+            <button type="button" data-assistant-prompt="我想预定会议室">预定会议室</button>
+            <button type="button" data-assistant-prompt="查询我最近一年的报销记录">查询报销记录</button>
+          </div>
+        </section>
 
         <section class="catalog-area" id="catalogArea" aria-live="polite"></section>
       </main>
@@ -95,7 +105,7 @@
               <button class="native-upload-btn" id="nativeUploadBtn" type="button" aria-label="通讯费报销">
                 通讯费报销
               </button>
-              <textarea id="assistantInput" placeholder="输入你想问的问题..." rows="1"></textarea>
+              <textarea id="assistantInput" placeholder="查询会议、报销记录，或问问公司制度..." rows="1"></textarea>
               <input id="difyAttachmentInput" type="file" accept="image/*,application/pdf" multiple style="display:none;" />
               <button id="difyAttachmentBtn" class="assistant-mic-btn" type="button" aria-label="上传发票附件">
                 <i data-lucide="paperclip"></i>

@@ -50,11 +50,12 @@ const state = {
 
 const sectionNav = document.querySelector("#sectionNav");
 const catalogArea = document.querySelector("#catalogArea");
-const searchInput = document.querySelector("#globalSearch");
 const assistantToggle = document.querySelector("#assistantToggle");
 const assistantClose = document.querySelector("#assistantClose");
 const assistantPanel = document.querySelector("#assistantPanel");
 const assistantResizeHandle = document.querySelector("#assistantResizeHandle");
+const assistantHome = document.querySelector("#assistantHome");
+const assistantInlineMount = document.querySelector("#assistantInlineMount");
 const adminEntry = document.querySelector("#adminEntry");
 const ASSISTANT_SIZE_STORAGE_KEY = "intelligence-hub.assistant-size.v1";
 
@@ -118,7 +119,11 @@ function applyBranding() {
   setText(".brand-subtitle", c.brandSubtitle);
   setText(".topbar h1", c.brandName);
   setText(".assistant-fab-mark", c.assistantName);
-  if (c.assistantName) setText(".assistant-message-system .assistant-message-content", `你好！我是${c.assistantName}，有什么我可以帮您的吗？`);
+  if (c.assistantName) {
+    setText(".assistant-home-kicker", c.assistantName);
+    setText(".assistant-home-heading h2", `今天想让${c.assistantName}帮你做什么？`);
+    setText(".assistant-message-system .assistant-message-content", `你好！我是${c.assistantName}，有什么我可以帮您的吗？`);
+  }
   if (c.poweredBy) setText(".assistant-footer", `POWERED BY ${c.poweredBy}`);
 
   const photoWrap = document.querySelector(".daily-photo-display");
@@ -135,6 +140,7 @@ function applyBranding() {
 async function bootstrap() {
   await loadConfigs();
   applyBranding();
+  dockAssistantInline(false);
   const response = await fetch("./data/catalog.json", { cache: "no-store" });
   const data = await response.json();
   state.catalog = data.sections;
@@ -775,7 +781,7 @@ function renderExpenseUi(ui) {
 function renderAssistant() {
   const config = window.IntelligenceHubConfig || {};
   const title = config.assistantTitle || "智能问答";
-  assistantToggle.setAttribute("aria-label", `打开${title}`);
+  assistantToggle.setAttribute("aria-label", `在浮窗中打开${title}`);
   
   const inputEl = document.getElementById("assistantInput");
   const sendBtn = document.getElementById("assistantSendBtn");
@@ -1295,6 +1301,10 @@ function renderAssistant() {
 
     if (!text && uploadedFiles.length === 0) return;
 
+    if (!assistantPanel.classList.contains("is-floating")) {
+      setAssistantExpanded(true);
+    }
+
     latestRequestText = text;
     
     inputEl.value = "";
@@ -1473,6 +1483,13 @@ function renderAssistant() {
   };
 
   sendBtn.addEventListener("click", sendMessage);
+  document.querySelectorAll("[data-assistant-prompt]").forEach((button) => {
+    button.addEventListener("click", () => {
+      inputEl.value = button.dataset.assistantPrompt || "";
+      setAssistantExpanded(true);
+      sendMessage();
+    });
+  });
   inputEl.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -1485,12 +1502,55 @@ function renderAssistant() {
   });
 }
 
-function setAssistantOpen(isOpen) {
-  assistantPanel.classList.toggle("open", isOpen);
-  assistantPanel.setAttribute("aria-hidden", String(!isOpen));
-  assistantToggle.setAttribute("aria-expanded", String(isOpen));
+function setAssistantExpanded(isExpanded) {
+  if (!assistantPanel || assistantPanel.classList.contains("is-floating")) return;
+  assistantPanel.classList.toggle("is-expanded", isExpanded);
+  assistantHome?.classList.toggle("has-conversation", isExpanded);
+  assistantToggle?.parentElement?.classList.toggle("inline-panel-expanded", isExpanded);
+  if (assistantClose) {
+    assistantClose.setAttribute("aria-label", "收起首页对话");
+    assistantClose.setAttribute("title", "收起首页对话");
+  }
+}
+
+function dockAssistantInline(expand = true) {
+  if (!assistantPanel || !assistantInlineMount) return;
+  assistantInlineMount.appendChild(assistantPanel);
+  assistantPanel.classList.remove("is-floating");
+  assistantHome?.classList.remove("assistant-is-floating");
+  assistantToggle?.parentElement?.classList.remove("has-floating-panel");
+  assistantToggle?.parentElement?.style.removeProperty("--assistant-floating-panel-width");
+  assistantPanel.classList.add("open");
+  assistantPanel.setAttribute("aria-hidden", "false");
+  setAssistantExpanded(expand);
+  assistantToggle?.setAttribute("aria-expanded", "false");
   const assistantTitle = (window.IntelligenceHubConfig || {}).assistantTitle || "智能问答";
-  assistantToggle.setAttribute("aria-label", (isOpen ? "关闭" : "打开") + assistantTitle);
+  assistantToggle?.setAttribute("aria-label", `在浮窗中打开${assistantTitle}`);
+  assistantToggle?.setAttribute("title", "在浮窗中打开");
+}
+
+function floatAssistant() {
+  if (!assistantPanel) return;
+  document.body.appendChild(assistantPanel);
+  assistantPanel.classList.add("open", "is-floating", "is-expanded");
+  assistantPanel.setAttribute("aria-hidden", "false");
+  assistantHome?.classList.add("has-conversation");
+  assistantHome?.classList.add("assistant-is-floating");
+  assistantToggle?.parentElement?.classList.remove("inline-panel-expanded");
+  assistantToggle?.parentElement?.classList.add("has-floating-panel");
+  assistantToggle?.parentElement?.style.setProperty(
+    "--assistant-floating-panel-width",
+    `${Math.round(assistantPanel.getBoundingClientRect().width)}px`,
+  );
+  assistantToggle?.setAttribute("aria-expanded", "true");
+  const assistantTitle = (window.IntelligenceHubConfig || {}).assistantTitle || "智能问答";
+  assistantToggle?.setAttribute("aria-label", `将${assistantTitle}放回首页`);
+  assistantToggle?.setAttribute("title", "放回首页");
+  if (assistantClose) {
+    assistantClose.setAttribute("aria-label", "关闭浮窗并放回首页");
+    assistantClose.setAttribute("title", "放回首页");
+  }
+  document.getElementById("assistantInput")?.focus();
 }
 
 function initAssistantResize() {
@@ -1515,6 +1575,9 @@ function initAssistantResize() {
     const nextHeight = clamp(height, minHeight, maxHeight);
     assistantPanel.style.width = `${nextWidth}px`;
     assistantPanel.style.height = `${nextHeight}px`;
+    if (assistantPanel.classList.contains("is-floating")) {
+      assistantToggle?.parentElement?.style.setProperty("--assistant-floating-panel-width", `${nextWidth}px`);
+    }
     assistantResizeHandle.setAttribute("aria-label", `当前窗口宽 ${nextWidth} 像素、高 ${nextHeight} 像素；拖动或使用方向键调整`);
     if (persist) {
       try {
@@ -1621,11 +1684,21 @@ async function tryOpenAdmin() {
 }
 
 assistantToggle.addEventListener("click", () => {
-  setAssistantOpen(!assistantPanel.classList.contains("open"));
+  if (assistantPanel.classList.contains("is-floating")) {
+    dockAssistantInline(true);
+    assistantHome?.scrollIntoView({ behavior: "smooth", block: "start" });
+  } else {
+    floatAssistant();
+  }
 });
 
 assistantClose.addEventListener("click", () => {
-  setAssistantOpen(false);
+  if (assistantPanel.classList.contains("is-floating")) {
+    dockAssistantInline(true);
+    assistantHome?.scrollIntoView({ behavior: "smooth", block: "start" });
+  } else {
+    setAssistantExpanded(false);
+  }
 });
 
 catalogArea.addEventListener("click", (event) => {
@@ -1638,7 +1711,11 @@ adminEntry.addEventListener("click", tryOpenAdmin);
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
-    setAssistantOpen(false);
+    if (assistantPanel.classList.contains("is-floating")) {
+      dockAssistantInline(true);
+    } else {
+      setAssistantExpanded(false);
+    }
   }
 });
 
