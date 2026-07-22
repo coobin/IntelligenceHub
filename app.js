@@ -120,7 +120,6 @@ function applyBranding() {
   setText(".topbar h1", c.brandName);
   setText(".assistant-fab-mark", c.assistantName);
   if (c.assistantName) {
-    setText(".assistant-home-kicker", c.assistantName);
     setText(".assistant-home-heading h2", `今天想让${c.assistantName}帮你做什么？`);
     setText(".assistant-message-system .assistant-message-content", `你好！我是${c.assistantName}，有什么我可以帮您的吗？`);
   }
@@ -1771,13 +1770,6 @@ function renderAssistant() {
   };
 
   sendBtn.addEventListener("click", sendMessage);
-  document.querySelectorAll("[data-assistant-prompt]").forEach((button) => {
-    button.addEventListener("click", () => {
-      inputEl.value = button.dataset.assistantPrompt || "";
-      setAssistantExpanded(true);
-      sendMessage();
-    });
-  });
   inputEl.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();

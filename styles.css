@@ -198,10 +198,6 @@ h1 {
 }
 
 .assistant-home-heading {
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 24px;
   margin-bottom: 12px;
 }
 
@@ -209,20 +205,6 @@ h1 {
   margin: 0;
   font-size: clamp(20px, 2vw, 27px);
   line-height: 1.25;
-}
-
-.assistant-home-heading > p {
-  margin: 0 0 3px;
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.assistant-home-kicker {
-  margin: 0 0 5px;
-  color: var(--accent);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
 }
 
 .assistant-inline-mount {
@@ -284,44 +266,8 @@ h1 {
   position: absolute;
 }
 
-.assistant-quick-prompts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.assistant-quick-prompts button {
-  min-height: 32px;
-  padding: 0 12px;
-  border: 1px solid #cbd9ec;
-  border-radius: 999px;
-  color: #42536b;
-  background: rgba(255, 255, 255, 0.7);
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: color 140ms ease, border-color 140ms ease, background 140ms ease;
-}
-
-.assistant-quick-prompts button:hover,
-.assistant-quick-prompts button:focus-visible {
-  color: var(--accent-strong);
-  border-color: #93b4f4;
-  background: #ffffff;
-}
-
-.assistant-home.has-conversation .assistant-home-heading > p,
-.assistant-home.has-conversation .assistant-quick-prompts {
-  display: none;
-}
-
 .assistant-home.has-conversation .assistant-home-heading {
   margin-bottom: 9px;
-}
-
-.assistant-home.has-conversation .assistant-home-kicker {
-  display: none;
 }
 
 .assistant-home.has-conversation .assistant-home-heading h2 {
@@ -2063,16 +2009,6 @@ h1 {
     padding: 22px;
   }
 
-  .assistant-home-heading {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 5px;
-  }
-
-  .assistant-home-heading > p {
-    margin-bottom: 0;
-  }
-
   .topbar {
     grid-template-columns: 1fr;
   }
@@ -2135,16 +2071,6 @@ h1 {
 
   .assistant-inline-mount .assistant-panel:not(.is-expanded) .native-upload-btn {
     display: none;
-  }
-
-  .assistant-quick-prompts {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    padding-bottom: 3px;
-  }
-
-  .assistant-quick-prompts button {
-    white-space: nowrap;
   }
 
 }
