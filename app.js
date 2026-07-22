@@ -323,9 +323,11 @@ function renderCard(item) {
 
 let chatConversationId = "";
 
-const CHAT_HISTORY_STORAGE_PREFIX = "intelligence-hub.chat.v1";
+const CHAT_HISTORY_LEGACY_STORAGE_PREFIX = "intelligence-hub.chat.v1";
+const CHAT_SESSIONS_STORAGE_PREFIX = "intelligence-hub.chat.v2";
 const CHAT_HISTORY_MAX_MESSAGES = 80;
 const CHAT_HISTORY_MAX_CHARS = 600000;
+const CHAT_SESSIONS_MAX = 30;
 
 const MEETING_UI_START = "[CHENCY_MEETING_UI]";
 const MEETING_UI_END = "[/CHENCY_MEETING_UI]";
@@ -790,47 +792,185 @@ function renderAssistant() {
   const attachInput = document.getElementById("difyAttachmentInput");
   const attachPool = document.getElementById("assistantAttachmentPool");
   const clearBtn = document.getElementById("assistantClear");
+  const historyToggle = document.getElementById("assistantHistoryToggle");
+  const historyLayer = document.getElementById("assistantHistoryLayer");
+  const historyBackdrop = document.getElementById("assistantHistoryBackdrop");
+  const historyClose = document.getElementById("assistantHistoryClose");
+  const sessionListEl = document.getElementById("assistantSessionList");
+  const sessionLabel = document.getElementById("assistantSessionLabel");
+  const newChatBtn = document.getElementById("assistantNewChat");
+  const clearAllBtn = document.getElementById("assistantClearAll");
   
   let uploadedFiles = [];
   let pendingMeetingAction = null;
   let pendingMeetingContinuation = null;
   let latestRequestText = "";
   let chatHistory = [];
+  let activeSessionId = "";
+  let historicalSessionSelected = false;
+  let sessionStore = { version: 2, activeSessionId: "", sessions: [] };
+  let requestInFlight = false;
 
   if (!inputEl || !sendBtn || !messagesEl) return;
 
-  const historyKey = `${CHAT_HISTORY_STORAGE_PREFIX}:${encodeURIComponent(state.user || "anonymous")}`;
+  const userStorageSuffix = encodeURIComponent(state.user || "anonymous");
+  const legacyHistoryKey = `${CHAT_HISTORY_LEGACY_STORAGE_PREFIX}:${userStorageSuffix}`;
+  const sessionsKey = `${CHAT_SESSIONS_STORAGE_PREFIX}:${userStorageSuffix}`;
   const welcomeText = messagesEl.querySelector(".assistant-message-system .assistant-message-content")?.textContent?.trim()
     || `你好！我是${config.assistantName || "AI 助手"}，有什么我可以帮您的吗？`;
 
-  const updateClearState = () => {
-    if (clearBtn) clearBtn.disabled = chatHistory.length === 0 && !chatConversationId;
+  const localDateKey = (timestamp = Date.now()) => {
+    const date = new Date(timestamp);
+    const pad = (value) => String(value).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
   };
 
-  const persistHistory = () => {
-    updateClearState();
-    try {
-      localStorage.setItem(historyKey, JSON.stringify({
-        version: 1,
-        conversationId: chatConversationId,
-        meetingContinuation: pendingMeetingContinuation,
-        messages: chatHistory,
-        savedAt: Date.now(),
-      }));
-    } catch (error) {
-      console.warn("[Assistant History] save failed", error);
+  const yesterdayDateKey = () => {
+    const date = new Date();
+    date.setDate(date.getDate() - 1);
+    return localDateKey(date.getTime());
+  };
+
+  const createSession = ({ title: sessionTitle = "新对话", timestamp = Date.now(), legacy = false } = {}) => ({
+    id: typeof window.crypto?.randomUUID === "function"
+      ? window.crypto.randomUUID()
+      : `session-${timestamp}-${Math.random().toString(36).slice(2, 10)}`,
+    title: sessionTitle,
+    dateKey: localDateKey(timestamp),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    conversationId: "",
+    meetingContinuation: null,
+    messages: [],
+    legacy,
+  });
+
+  const getActiveSession = () => sessionStore.sessions.find((session) => session.id === activeSessionId) || null;
+
+  const sessionTitleFromMessages = (messages) => {
+    const firstUserText = messages.find((item) => item.role === "user")?.text || "";
+    const normalized = firstUserText.replace(/\s+/g, " ").trim();
+    return normalized ? `${normalized.slice(0, 28)}${normalized.length > 28 ? "…" : ""}` : "新对话";
+  };
+
+  const sessionDayLabel = (dateKey) => {
+    if (dateKey === localDateKey()) return "今天";
+    if (dateKey === yesterdayDateKey()) return "昨天";
+    const date = new Date(`${dateKey}T12:00:00`);
+    return Number.isNaN(date.getTime()) ? dateKey : `${date.getMonth() + 1}月${date.getDate()}日`;
+  };
+
+  const updateSessionLabel = () => {
+    if (!sessionLabel) return;
+    const active = getActiveSession();
+    if (active?.legacy) {
+      sessionLabel.textContent = "原有对话 · 历史记录";
+      return;
     }
+    const dayLabel = sessionDayLabel(active?.dateKey || localDateKey());
+    sessionLabel.textContent = active?.dateKey === localDateKey()
+      ? "今天 · 自动保存"
+      : `${dayLabel} · 历史对话`;
+  };
+
+  const renderSessionList = () => {
+    if (!sessionListEl) return;
+    const sorted = [...sessionStore.sessions].sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
+    const groups = [];
+    sorted.forEach((session) => {
+      const label = sessionDayLabel(session.dateKey);
+      let group = groups.find((item) => item.label === label);
+      if (!group) {
+        group = { label, sessions: [] };
+        groups.push(group);
+      }
+      group.sessions.push(session);
+    });
+    sessionListEl.innerHTML = groups.map((group) => `
+      <section class="assistant-session-group">
+        <h4>${escapeHtml(group.label)}</h4>
+        ${group.sessions.map((session) => {
+          const time = new Date(Number(session.updatedAt || session.createdAt || Date.now())).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false });
+          return `
+            <button class="assistant-session-item${session.id === activeSessionId ? " active" : ""}" type="button" data-session-id="${escapeAttribute(session.id)}" aria-current="${session.id === activeSessionId ? "true" : "false"}" ${requestInFlight ? "disabled" : ""}>
+              <span class="assistant-session-title">${escapeHtml(session.title || "新对话")}</span>
+              <span class="assistant-session-meta"><time>${escapeHtml(time)}</time><span>${session.legacy ? "升级前记录" : "自动保存"}</span></span>
+            </button>
+          `;
+        }).join("")}
+      </section>
+    `).join("");
+  };
+
+  const updateClearState = () => {
+    if (clearBtn) clearBtn.disabled = requestInFlight || (sessionStore.sessions.length <= 1 && chatHistory.length === 0 && !chatConversationId);
+  };
+
+  const syncActiveSession = () => {
+    const active = getActiveSession();
+    if (!active) return;
+    active.conversationId = chatConversationId;
+    active.meetingContinuation = pendingMeetingContinuation;
+    active.messages = chatHistory.slice(-CHAT_HISTORY_MAX_MESSAGES);
+    if (!active.legacy && (!active.title || active.title === "新对话")) {
+      active.title = sessionTitleFromMessages(active.messages);
+    }
+  };
+
+  const pruneSessionStore = () => {
+    const active = getActiveSession();
+    const candidates = [active, ...sessionStore.sessions
+      .filter((session) => session && session.id !== active?.id)
+      .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0))]
+      .filter(Boolean);
+    const kept = [];
+    let totalChars = 0;
+    candidates.forEach((session) => {
+      const messages = Array.isArray(session.messages)
+        ? session.messages
+          .filter((item) => item && ["user", "system"].includes(item.role) && typeof item.text === "string")
+          .slice(-CHAT_HISTORY_MAX_MESSAGES)
+        : [];
+      while (messages.length > 1 && messages.reduce((sum, item) => sum + item.text.length, 0) > CHAT_HISTORY_MAX_CHARS) {
+        messages.shift();
+      }
+      const charCount = messages.reduce((sum, item) => sum + item.text.length, 0);
+      const isActive = session.id === activeSessionId;
+      const isUseful = isActive || messages.length > 0 || session.conversationId;
+      if (!isUseful || (!isActive && (kept.length >= CHAT_SESSIONS_MAX || totalChars + charCount > CHAT_HISTORY_MAX_CHARS))) return;
+      session.messages = messages;
+      kept.push(session);
+      totalChars += charCount;
+    });
+    sessionStore.sessions = kept.sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
+  };
+
+  const persistSessionStore = () => {
+    syncActiveSession();
+    pruneSessionStore();
+    sessionStore.activeSessionId = activeSessionId;
+    try {
+      localStorage.setItem(sessionsKey, JSON.stringify(sessionStore));
+    } catch (error) {
+      console.warn("[Assistant Sessions] save failed", error);
+    }
+    updateSessionLabel();
+    renderSessionList();
+    updateClearState();
+    if (window.lucide) window.lucide.createIcons();
   };
 
   const rememberMessage = (role, text) => {
     const value = String(text || "").trim();
     if (!value || !["user", "system"].includes(role)) return;
-    chatHistory.push({ role, text: value });
+    chatHistory.push({ role, text: value, at: Date.now() });
     chatHistory = chatHistory.slice(-CHAT_HISTORY_MAX_MESSAGES);
     while (chatHistory.length > 1 && chatHistory.reduce((sum, item) => sum + item.text.length, 0) > CHAT_HISTORY_MAX_CHARS) {
       chatHistory.shift();
     }
-    persistHistory();
+    const active = getActiveSession();
+    if (active) active.updatedAt = Date.now();
+    persistSessionStore();
   };
 
   const resetMessages = () => {
@@ -1062,36 +1202,42 @@ function renderAssistant() {
       : escapeHtml(visibleText || "");
   };
 
-  const restoreHistory = () => {
-    let stored;
-    try {
-      stored = JSON.parse(localStorage.getItem(historyKey) || "null");
-    } catch (error) {
-      console.warn("[Assistant History] invalid history", error);
-      try { localStorage.removeItem(historyKey); } catch (storageError) {}
-      updateClearState();
-      return;
-    }
+  const setHistoryOpen = (isOpen) => {
+    historyLayer?.classList.toggle("open", isOpen);
+    historyLayer?.setAttribute("aria-hidden", String(!isOpen));
+    historyToggle?.setAttribute("aria-expanded", String(isOpen));
+    if (isOpen) renderSessionList();
+  };
 
-    const storedMessages = Array.isArray(stored?.messages)
-      ? stored.messages
+  const clearUploadedFiles = () => {
+    uploadedFiles.forEach((file) => file.chipEl?.remove());
+    uploadedFiles = [];
+    if (attachPool) attachPool.style.display = "none";
+  };
+
+  const renderSessionMessages = (session) => {
+    const storedMessages = Array.isArray(session?.messages)
+      ? session.messages
         .filter((item) => item && ["user", "system"].includes(item.role) && typeof item.text === "string")
         .slice(-CHAT_HISTORY_MAX_MESSAGES)
       : [];
+    chatConversationId = typeof session?.conversationId === "string" ? session.conversationId : "";
+    chatHistory = storedMessages;
+    pendingMeetingAction = null;
+    pendingMeetingContinuation = null;
+    latestRequestText = "";
+
     if (!storedMessages.length) {
-      chatConversationId = "";
-      updateClearState();
+      resetMessages();
       return;
     }
 
-    chatConversationId = typeof stored.conversationId === "string" ? stored.conversationId : "";
-    chatHistory = storedMessages;
     messagesEl.innerHTML = "";
     let lastRestoredUserText = "";
     let inferredMeetingContinuation = null;
-
     storedMessages.forEach((item) => {
       if (item.role === "system") {
+        latestRequestText = lastRestoredUserText;
         const restoredMeetingUi = parseMeetingUiReply(item.text).ui;
         if (PENDING_BOOKING_UI_TYPES.has(restoredMeetingUi?.type) && lastRestoredUserText) {
           inferredMeetingContinuation = { operation: "book", query: lastRestoredUserText };
@@ -1109,37 +1255,175 @@ function renderAssistant() {
         }
       }
     });
-
     messagesEl.querySelectorAll('[data-meeting-ui="booking_preview"], [data-meeting-ui="cancel_preview"]').forEach((root) => {
       if (pendingMeetingAction?.root !== root) lockMeetingCard(root, "已处理");
     });
-    pendingMeetingContinuation = stored?.meetingContinuation?.operation === "book"
-      && typeof stored.meetingContinuation.query === "string"
-      && stored.meetingContinuation.query.trim()
-      ? { operation: "book", query: stored.meetingContinuation.query.trim() }
+    pendingMeetingContinuation = session?.meetingContinuation?.operation === "book"
+      && typeof session.meetingContinuation.query === "string"
+      && session.meetingContinuation.query.trim()
+      ? { operation: "book", query: session.meetingContinuation.query.trim() }
       : inferredMeetingContinuation;
-    updateClearState();
+    latestRequestText = lastRestoredUserText;
     if (window.lucide) window.lucide.createIcons();
     messagesEl.scrollTop = messagesEl.scrollHeight;
   };
 
-  restoreHistory();
+  const activateSession = (sessionId, { expand = false, explicit = false, preserveComposer = false } = {}) => {
+    const nextSession = sessionStore.sessions.find((session) => session.id === sessionId);
+    if (!nextSession) return;
+    if (activeSessionId && activeSessionId !== sessionId) syncActiveSession();
+    activeSessionId = nextSession.id;
+    sessionStore.activeSessionId = nextSession.id;
+    historicalSessionSelected = explicit && nextSession.dateKey !== localDateKey();
+    if (!preserveComposer) {
+      clearUploadedFiles();
+      inputEl.value = "";
+      inputEl.style.height = "auto";
+    }
+    renderSessionMessages(nextSession);
+    persistSessionStore();
+    setHistoryOpen(false);
+    if (expand) setAssistantExpanded(true);
+    inputEl.focus();
+  };
+
+  const createFreshSession = ({ expand = true, preserveComposer = false } = {}) => {
+    const active = getActiveSession();
+    if (active && active.dateKey === localDateKey() && chatHistory.length === 0 && !chatConversationId) {
+      activateSession(active.id, { expand, preserveComposer });
+      return active;
+    }
+    syncActiveSession();
+    const session = createSession();
+    sessionStore.sessions.unshift(session);
+    historicalSessionSelected = false;
+    activateSession(session.id, { expand, preserveComposer });
+    return session;
+  };
+
+  const loadSessionStore = () => {
+    let stored = null;
+    let migratedFromLegacy = false;
+    try {
+      stored = JSON.parse(localStorage.getItem(sessionsKey) || "null");
+    } catch (error) {
+      console.warn("[Assistant Sessions] invalid store", error);
+    }
+
+    if (stored?.version === 2 && Array.isArray(stored.sessions)) {
+      sessionStore = {
+        version: 2,
+        activeSessionId: typeof stored.activeSessionId === "string" ? stored.activeSessionId : "",
+        sessions: stored.sessions
+          .filter((session) => session && typeof session.id === "string")
+          .map((session) => ({
+            id: session.id,
+            title: typeof session.title === "string" && session.title.trim() ? session.title.trim() : "新对话",
+            dateKey: typeof session.dateKey === "string" ? session.dateKey : localDateKey(Number(session.createdAt) || Date.now()),
+            createdAt: Number(session.createdAt) || Date.now(),
+            updatedAt: Number(session.updatedAt) || Number(session.createdAt) || Date.now(),
+            conversationId: typeof session.conversationId === "string" ? session.conversationId : "",
+            meetingContinuation: session.meetingContinuation || null,
+            messages: Array.isArray(session.messages) ? session.messages : [],
+            legacy: Boolean(session.legacy),
+          })),
+      };
+    } else {
+      let legacy = null;
+      try {
+        legacy = JSON.parse(localStorage.getItem(legacyHistoryKey) || "null");
+      } catch (error) {
+        console.warn("[Assistant Sessions] legacy history invalid", error);
+      }
+      sessionStore = { version: 2, activeSessionId: "", sessions: [] };
+      const legacyMessages = Array.isArray(legacy?.messages)
+        ? legacy.messages.filter((item) => item && ["user", "system"].includes(item.role) && typeof item.text === "string")
+        : [];
+      if (legacyMessages.length || legacy?.conversationId) {
+        const migrated = createSession({
+          title: "原有对话（升级前）",
+          timestamp: Number(legacy.savedAt) || Date.now(),
+          legacy: true,
+        });
+        migrated.conversationId = typeof legacy.conversationId === "string" ? legacy.conversationId : "";
+        migrated.meetingContinuation = legacy.meetingContinuation || null;
+        migrated.messages = legacyMessages;
+        sessionStore.sessions.push(migrated);
+        migratedFromLegacy = true;
+      }
+    }
+
+    const storedActive = sessionStore.sessions.find((session) => session.id === sessionStore.activeSessionId);
+    const todaySession = !migratedFromLegacy && !storedActive?.legacy && storedActive?.dateKey === localDateKey()
+      ? storedActive
+      : !migratedFromLegacy ? sessionStore.sessions
+        .filter((session) => session.dateKey === localDateKey() && !session.legacy)
+        .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0))[0] : null;
+    const initialSession = todaySession || createSession();
+    if (!sessionStore.sessions.some((session) => session.id === initialSession.id)) {
+      sessionStore.sessions.unshift(initialSession);
+    }
+    activateSession(initialSession.id);
+  };
+
+  const setSessionControlsLocked = (locked) => {
+    requestInFlight = locked;
+    sendBtn.disabled = locked;
+    [historyToggle, newChatBtn, clearBtn, clearAllBtn].forEach((button) => {
+      if (button) button.disabled = locked;
+    });
+    renderSessionList();
+    updateClearState();
+  };
+
+  const ensureDailySessionBeforeSend = () => {
+    const active = getActiveSession();
+    if (active && active.dateKey !== localDateKey() && !historicalSessionSelected) {
+      createFreshSession({ expand: false, preserveComposer: true });
+    }
+  };
+
+  loadSessionStore();
+
+  historyToggle?.addEventListener("click", () => setHistoryOpen(!historyLayer?.classList.contains("open")));
+  historyBackdrop?.addEventListener("click", () => setHistoryOpen(false));
+  historyClose?.addEventListener("click", () => setHistoryOpen(false));
+  sessionListEl?.addEventListener("click", (event) => {
+    if (requestInFlight) return;
+    const button = event.target.closest("[data-session-id]");
+    if (!button) return;
+    activateSession(button.dataset.sessionId, { expand: true, explicit: true });
+  });
+  newChatBtn?.addEventListener("click", () => {
+    if (!requestInFlight) createFreshSession();
+  });
 
   if (clearBtn) {
     clearBtn.addEventListener("click", () => {
-      if (clearBtn.disabled) return;
-      if (!window.confirm("清空当前浏览器中保存的对话记录？此操作不会删除已经预定的会议或提交的报销。")) return;
-      try { localStorage.removeItem(historyKey); } catch (storageError) {}
-      chatHistory = [];
-      chatConversationId = "";
-      pendingMeetingAction = null;
-      pendingMeetingContinuation = null;
-      latestRequestText = "";
-      resetMessages();
-      updateClearState();
-      inputEl.focus();
+      if (clearBtn.disabled || requestInFlight) return;
+      if (!window.confirm("删除当前对话？此操作不会删除已经预定的会议或提交的报销。")) return;
+      sessionStore.sessions = sessionStore.sessions.filter((session) => session.id !== activeSessionId);
+      const nextTodaySession = sessionStore.sessions
+        .filter((session) => session.dateKey === localDateKey())
+        .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0))[0];
+      const nextSession = nextTodaySession || createSession();
+      if (!sessionStore.sessions.some((session) => session.id === nextSession.id)) {
+        sessionStore.sessions.unshift(nextSession);
+      }
+      activeSessionId = "";
+      activateSession(nextSession.id, { expand: true });
     });
   }
+
+  clearAllBtn?.addEventListener("click", () => {
+    if (requestInFlight) return;
+    if (!window.confirm("清除当前浏览器中的全部对话记录？此操作不会删除已经预定的会议或提交的报销。")) return;
+    try { localStorage.removeItem(legacyHistoryKey); } catch (storageError) {}
+    const session = createSession();
+    sessionStore = { version: 2, activeSessionId: session.id, sessions: [session] };
+    activeSessionId = "";
+    activateSession(session.id, { expand: true });
+  });
 
   // 语音输入：录音 -> /api/chat/audio (Dify audio-to-text) -> 填入输入框
   const micBtn = document.getElementById("assistantMicBtn");
@@ -1257,6 +1541,8 @@ function renderAssistant() {
   }
 
   const sendMessage = async (options = {}) => {
+    if (requestInFlight) return;
+    const continueCurrentSession = Boolean(options.meetingAction || pendingMeetingAction || pendingMeetingContinuation);
     const typedText = inputEl.value.trim();
     let text = options.queryText !== undefined ? options.queryText : typedText;
     let displayText = options.displayText !== undefined ? options.displayText : typedText;
@@ -1301,6 +1587,8 @@ function renderAssistant() {
 
     if (!text && uploadedFiles.length === 0) return;
 
+    if (!continueCurrentSession) ensureDailySessionBeforeSend();
+
     if (!assistantPanel.classList.contains("is-floating")) {
       setAssistantExpanded(true);
     }
@@ -1337,7 +1625,7 @@ function renderAssistant() {
     if (attachPool) attachPool.style.display = "none";
     
     const replyContentDiv = appendMessage("system", "正在思考...", { skipHistory: true });
-    sendBtn.disabled = true;
+    setSessionControlsLocked(true);
     
     try {
       const response = await fetch("/api/chat", {
@@ -1477,7 +1765,7 @@ function renderAssistant() {
       replyContentDiv.textContent = "抱歉，请求出错，请稍后再试。";
       rememberMessage("system", replyContentDiv.textContent);
     } finally {
-      sendBtn.disabled = false;
+      setSessionControlsLocked(false);
       inputEl.focus();
     }
   };
@@ -1515,6 +1803,9 @@ function setAssistantExpanded(isExpanded) {
 
 function dockAssistantInline(expand = true) {
   if (!assistantPanel || !assistantInlineMount) return;
+  document.getElementById("assistantHistoryLayer")?.classList.remove("open");
+  document.getElementById("assistantHistoryLayer")?.setAttribute("aria-hidden", "true");
+  document.getElementById("assistantHistoryToggle")?.setAttribute("aria-expanded", "false");
   assistantInlineMount.appendChild(assistantPanel);
   assistantPanel.classList.remove("is-floating");
   assistantHome?.classList.remove("assistant-is-floating");
@@ -1531,6 +1822,9 @@ function dockAssistantInline(expand = true) {
 
 function floatAssistant() {
   if (!assistantPanel) return;
+  document.getElementById("assistantHistoryLayer")?.classList.remove("open");
+  document.getElementById("assistantHistoryLayer")?.setAttribute("aria-hidden", "true");
+  document.getElementById("assistantHistoryToggle")?.setAttribute("aria-expanded", "false");
   document.body.appendChild(assistantPanel);
   assistantPanel.classList.add("open", "is-floating", "is-expanded");
   assistantPanel.setAttribute("aria-hidden", "false");
@@ -1711,6 +2005,11 @@ adminEntry.addEventListener("click", tryOpenAdmin);
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
+    const historyLayer = document.getElementById("assistantHistoryLayer");
+    if (historyLayer?.classList.contains("open")) {
+      document.getElementById("assistantHistoryClose")?.click();
+      return;
+    }
     if (assistantPanel.classList.contains("is-floating")) {
       dockAssistantInline(true);
     } else {

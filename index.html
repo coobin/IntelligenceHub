@@ -13,11 +13,11 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./assets/icons/icon-192.png" type="image/png" />
     <link rel="apple-touch-icon" href="./assets/icons/apple-touch-icon.png" />
-    <link rel="stylesheet" href="./styles.css?v=20260722_01" />
+    <link rel="stylesheet" href="./styles.css?v=20260722_02" />
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://unpkg.com/marked@12.0.0/marked.min.js"></script>
     <script src="https://unpkg.com/dompurify@3.0.9/dist/purify.min.js"></script>
-    <script type="module" src="./app.js?v=20260722_01"></script>
+    <script type="module" src="./app.js?v=20260722_02"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -84,10 +84,32 @@
         
         <button class="assistant-close floating-close" id="assistantClose" type="button" aria-label="关闭问答">×</button>
         <div class="assistant-history-toolbar" aria-label="对话记录">
-          <span class="assistant-history-state"><i data-lucide="history"></i>本机保存</span>
-          <button class="assistant-clear" id="assistantClear" type="button" aria-label="清空对话" title="清空本机保存的对话">
-            <i data-lucide="trash-2"></i><span>清空</span>
+          <button class="assistant-history-state" id="assistantHistoryToggle" type="button" aria-expanded="false" aria-controls="assistantHistoryDrawer">
+            <i data-lucide="history"></i><span id="assistantSessionLabel">今天 · 自动保存</span><i class="assistant-history-chevron" data-lucide="chevron-down"></i>
           </button>
+          <button class="assistant-new-chat" id="assistantNewChat" type="button" aria-label="新建对话" title="新建对话">
+            <i data-lucide="square-pen"></i><span>新对话</span>
+          </button>
+          <button class="assistant-clear" id="assistantClear" type="button" aria-label="删除当前对话" title="删除当前对话">
+            <i data-lucide="trash-2"></i><span>删除</span>
+          </button>
+        </div>
+        <div class="assistant-history-layer" id="assistantHistoryLayer" aria-hidden="true">
+          <button class="assistant-history-backdrop" id="assistantHistoryBackdrop" type="button" aria-label="关闭对话记录"></button>
+          <section class="assistant-history-drawer" id="assistantHistoryDrawer" aria-label="已保存的对话">
+            <header class="assistant-history-header">
+              <div>
+                <p>本机保存</p>
+                <h3>对话记录</h3>
+              </div>
+              <button id="assistantHistoryClose" type="button" aria-label="关闭对话记录">×</button>
+            </header>
+            <div class="assistant-session-list" id="assistantSessionList"></div>
+            <footer class="assistant-history-footer">
+              <button id="assistantClearAll" type="button"><i data-lucide="trash-2"></i>清除全部记录</button>
+              <p>记录仅保存在当前浏览器</p>
+            </footer>
+          </section>
         </div>
         <div class="assistant-chat-container">
           <div class="assistant-messages" id="assistantMessages">
