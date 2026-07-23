@@ -332,7 +332,94 @@ const MEETING_UI_START = "[CHENCY_MEETING_UI]";
 const MEETING_UI_END = "[/CHENCY_MEETING_UI]";
 const EXPENSE_UI_START = "[CHENCY_EXPENSE_UI]";
 const EXPENSE_UI_END = "[/CHENCY_EXPENSE_UI]";
+const CITATIONS_UI_START = "[CHENCY_CITATIONS_UI]";
+const CITATIONS_UI_END = "[/CHENCY_CITATIONS_UI]";
 const PENDING_BOOKING_UI_TYPES = new Set(["booking_needs_info", "booking_conflict"]);
+
+function stripThinkingContent(value, complete = false) {
+  let text = String(value || "");
+  text = text.replace(/<think\b[^>]*>[\s\S]*?<\/think>/gi, "");
+
+  const unfinishedThink = /<think\b[^>]*>/i.exec(text);
+  if (unfinishedThink) {
+    text = text.slice(0, unfinishedThink.index);
+  } else {
+    const possibleTag = text.trim();
+    if (possibleTag && "<think>".startsWith(possibleTag.toLowerCase())) return "";
+  }
+
+  if (complete) text = text.replace(/<\/?think\b[^>]*>/gi, "");
+  return text.replace(/^\s+/, "");
+}
+
+function normalizeCitationResources(resources) {
+  if (!Array.isArray(resources)) return [];
+  const seen = new Set();
+  return resources.reduce((result, resource, index) => {
+    if (!resource || typeof resource !== "object" || result.length >= 8) return result;
+    const documentName = String(resource.documentName || resource.document_name || "").trim();
+    const datasetName = String(resource.datasetName || resource.dataset_name || "").trim();
+    const content = String(resource.content || "").trim().slice(0, 1600);
+    const key = String(resource.segmentId || resource.segment_id || resource.documentId || resource.document_id || `${documentName}\n${content}`);
+    if (!key || seen.has(key)) return result;
+    seen.add(key);
+    result.push({
+      position: Number(resource.position) || index + 1,
+      datasetName,
+      documentName: documentName || `参考资料 ${index + 1}`,
+      content,
+      score: Number.isFinite(Number(resource.score)) ? Number(resource.score) : null,
+    });
+    return result;
+  }, []);
+}
+
+function parseCitationsReply(text) {
+  const source = String(text || "");
+  const start = source.lastIndexOf(CITATIONS_UI_START);
+  if (start === -1) return { cleanText: source, resources: [] };
+  const end = source.indexOf(CITATIONS_UI_END, start + CITATIONS_UI_START.length);
+  if (end === -1) return { cleanText: source.slice(0, start).trim(), resources: [] };
+  try {
+    const raw = source.slice(start + CITATIONS_UI_START.length, end).trim();
+    const payload = JSON.parse(raw);
+    const cleanText = `${source.slice(0, start)}${source.slice(end + CITATIONS_UI_END.length)}`.trim();
+    return payload?.schema === "chency.citations.v1"
+      ? { cleanText, resources: normalizeCitationResources(payload.resources) }
+      : { cleanText: source, resources: [] };
+  } catch (error) {
+    console.warn("[Citations UI] invalid payload", error);
+    return { cleanText: source, resources: [] };
+  }
+}
+
+function renderCitations(resources) {
+  const items = normalizeCitationResources(resources);
+  if (!items.length) return "";
+  return `
+    <section class="assistant-citations" aria-label="引用来源">
+      <header class="assistant-citations-header">
+        <span>引用来源</span>
+        <small>${items.length} 份资料</small>
+      </header>
+      <div class="assistant-citation-list">
+        ${items.map((item) => `
+          <details class="assistant-citation-item">
+            <summary>
+              <span class="assistant-citation-icon" aria-hidden="true"><i data-lucide="file-text"></i></span>
+              <span class="assistant-citation-title">
+                <strong>${escapeHtml(item.documentName)}</strong>
+                ${item.datasetName ? `<small>${escapeHtml(item.datasetName)}</small>` : ""}
+              </span>
+              <span class="assistant-citation-chevron" aria-hidden="true"></span>
+            </summary>
+            ${item.content ? `<div class="assistant-citation-excerpt"><p>${escapeHtml(item.content).replace(/\n/g, "<br>")}</p></div>` : ""}
+          </details>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
 
 function startsNewIntentDuringPendingBooking(text) {
   const value = String(text || "").trim();
@@ -1162,14 +1249,17 @@ function renderAssistant() {
   };
 
   const renderSystemReply = (contentDiv, text, complete = false) => {
-    const meetingParsed = parseMeetingUiReply(text);
-    const expenseParsed = parseExpenseUiReply(text);
+    const citationsParsed = parseCitationsReply(text);
+    const cleanReply = stripThinkingContent(citationsParsed.cleanText, complete);
+    const meetingParsed = parseMeetingUiReply(cleanReply);
+    const expenseParsed = parseExpenseUiReply(cleanReply);
+    const citationsHtml = complete ? renderCitations(citationsParsed.resources) : "";
     if (complete && expenseParsed.ui) {
       contentDiv.parentElement?.classList.remove("assistant-message-meeting");
       contentDiv.parentElement?.classList.add("assistant-message-expense");
       contentDiv.classList.remove("has-meeting-ui");
       contentDiv.classList.add("has-expense-ui");
-      contentDiv.innerHTML = renderExpenseUi(expenseParsed.ui);
+      contentDiv.innerHTML = renderExpenseUi(expenseParsed.ui) + citationsHtml;
       if (window.lucide) window.lucide.createIcons();
       return;
     }
@@ -1186,7 +1276,7 @@ function renderAssistant() {
       contentDiv.parentElement?.classList.add("assistant-message-meeting");
       contentDiv.classList.remove("has-expense-ui");
       contentDiv.classList.add("has-meeting-ui");
-      contentDiv.innerHTML = renderMeetingUi(meetingParsed.ui);
+      contentDiv.innerHTML = renderMeetingUi(meetingParsed.ui) + citationsHtml;
       bindMeetingUiActions(contentDiv, meetingParsed.ui);
       if (window.lucide) window.lucide.createIcons();
       return;
@@ -1195,10 +1285,12 @@ function renderAssistant() {
     contentDiv.parentElement?.classList.remove("assistant-message-expense");
     contentDiv.classList.remove("has-meeting-ui");
     contentDiv.classList.remove("has-expense-ui");
-    const visibleText = meetingParsed.cleanText || expenseParsed.cleanText || (complete ? text : "");
-    contentDiv.innerHTML = window.DOMPurify
+    const visibleText = meetingParsed.cleanText || expenseParsed.cleanText || (complete ? cleanReply : "");
+    const answerHtml = window.DOMPurify
       ? window.DOMPurify.sanitize(window.marked.parse(visibleText || ""))
       : escapeHtml(visibleText || "");
+    contentDiv.innerHTML = answerHtml + citationsHtml;
+    if (complete && window.lucide) window.lucide.createIcons();
   };
 
   const setHistoryOpen = (isOpen) => {
@@ -1650,6 +1742,7 @@ function renderAssistant() {
       let fullReply = "";
       const streamedMeetingUis = [];
       let streamedExpenseUi = null;
+      let streamedCitations = [];
       replyContentDiv.innerHTML = '<span class="assistant-typing" aria-label="思考中"><span class="assistant-typing-dot"></span><span class="assistant-typing-dot"></span><span class="assistant-typing-dot"></span></span>';
       
       let buffer = "";
@@ -1678,34 +1771,43 @@ function renderAssistant() {
                 replyContentDiv.innerHTML = '<span class="assistant-typing" aria-label="思考中"><span class="assistant-typing-dot"></span><span class="assistant-typing-dot"></span><span class="assistant-typing-dot"></span></span>';
               }
               if (data.event === "message" || data.event === "agent_message") {
-                if (fullReply === "" && !holdStructuredCardStream) replyContentDiv.innerHTML = "";
                 fullReply += data.answer || "";
                 if (!holdStructuredCardStream) {
-                  renderSystemReply(replyContentDiv, fullReply, false);
+                  const visibleStreamReply = stripThinkingContent(fullReply, false);
+                  if (visibleStreamReply) {
+                    renderSystemReply(replyContentDiv, fullReply, false);
+                  } else {
+                    replyContentDiv.innerHTML = '<span class="assistant-typing" aria-label="思考中"><span class="assistant-typing-dot"></span><span class="assistant-typing-dot"></span><span class="assistant-typing-dot"></span></span>';
+                  }
                 }
                 messagesEl.scrollTop = messagesEl.scrollHeight;
               } else if (data.event === "message_end" || data.event === "agent_message_end") {
                 if (data.conversation_id) {
                   chatConversationId = data.conversation_id;
                 }
+                streamedCitations = normalizeCitationResources(data.metadata?.retriever_resources);
               }
             } catch (e) {}
           }
         }
       }
 
-      const replyMeetingUi = findMeetingUiPayload(fullReply);
+      const cleanFullReply = stripThinkingContent(fullReply, true);
+      const replyMeetingUi = findMeetingUiPayload(cleanFullReply);
       const selectedMeetingUi = selectMeetingUiCandidate(
         replyMeetingUi ? [...streamedMeetingUis, replyMeetingUi] : streamedMeetingUis,
         queryDateRange,
       );
       const finalMeetingUi = filterMeetingUiByDateRange(selectedMeetingUi, queryDateRange);
-      const finalExpenseUi = findExpenseUiPayload(fullReply) || streamedExpenseUi;
-      const finalReply = finalExpenseUi
+      const finalExpenseUi = findExpenseUiPayload(cleanFullReply) || streamedExpenseUi;
+      const baseFinalReply = finalExpenseUi
         ? `${finalExpenseUi.message || ""}\n\n${EXPENSE_UI_START}${JSON.stringify(finalExpenseUi)}${EXPENSE_UI_END}`
         : finalMeetingUi
         ? `${finalMeetingUi.message || ""}\n\n${MEETING_UI_START}${JSON.stringify(finalMeetingUi)}${MEETING_UI_END}`
-        : fullReply;
+        : cleanFullReply;
+      const finalReply = streamedCitations.length
+        ? `${baseFinalReply}\n\n${CITATIONS_UI_START}${JSON.stringify({ schema: "chency.citations.v1", resources: streamedCitations })}${CITATIONS_UI_END}`
+        : baseFinalReply;
       renderSystemReply(replyContentDiv, finalReply, true);
       rememberMessage("system", finalReply);
       messagesEl.scrollTop = messagesEl.scrollHeight;

@@ -996,6 +996,132 @@ p {
   border-radius: 3px;
 }
 
+.assistant-citations {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #dce5f0;
+}
+
+.assistant-citations-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+  color: #53647b;
+}
+
+.assistant-citations-header span {
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.assistant-citations-header small {
+  color: #8a98aa;
+  font-size: 10px;
+}
+
+.assistant-citation-list {
+  display: grid;
+  gap: 6px;
+}
+
+.assistant-citation-item {
+  overflow: hidden;
+  background: #f8faff;
+  border: 1px solid #e3e9f2;
+  border-radius: 10px;
+}
+
+.assistant-citation-item summary {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) 10px;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 6px 10px;
+  list-style: none;
+  cursor: pointer;
+}
+
+.assistant-citation-item summary::-webkit-details-marker {
+  display: none;
+}
+
+.assistant-citation-item summary:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, 0.45);
+  outline-offset: -2px;
+}
+
+.assistant-citation-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: #c93636;
+  background: #fff0f0;
+  border-radius: 7px;
+}
+
+.assistant-citation-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.assistant-citation-title {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.assistant-citation-title strong,
+.assistant-citation-title small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assistant-citation-title strong {
+  color: #46566d;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.assistant-citation-title small {
+  color: #929eae;
+  font-size: 9px;
+}
+
+.assistant-citation-chevron {
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid #7c8ba0;
+  border-bottom: 1.5px solid #7c8ba0;
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform 160ms ease;
+}
+
+.assistant-citation-item[open] .assistant-citation-chevron {
+  transform: rotate(225deg) translate(-1px, -1px);
+}
+
+.assistant-citation-excerpt {
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 0 12px 10px 46px;
+}
+
+.assistant-citation-excerpt p {
+  margin: 0;
+  padding-top: 8px;
+  color: #64748b;
+  border-top: 1px dashed #d9e2ed;
+  font-size: 10px;
+  line-height: 1.65;
+}
+
 /* 会议助手：把会议操作呈现成紧凑的“行程单”，而不是普通文字气泡。 */
 .assistant-message-meeting {
   width: min(100%, 560px);
