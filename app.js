@@ -117,7 +117,6 @@ function applyBranding() {
   if (c.siteTitle) document.title = c.siteTitle;
   setText(".brand-name", c.brandName);
   setText(".brand-subtitle", c.brandSubtitle);
-  setText(".topbar h1", c.brandName);
   setText(".assistant-fab-mark", c.assistantName);
   if (c.assistantName) {
     setText(".assistant-home-heading h2", `今天想让${c.assistantName}帮你做什么？`);
