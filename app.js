@@ -119,7 +119,8 @@ function applyBranding() {
   setText(".brand-subtitle", c.brandSubtitle);
   setText(".assistant-fab-mark", c.assistantName);
   if (c.assistantName) {
-    setText(".assistant-home-heading h2", `今天想让${c.assistantName}帮你做什么？`);
+    const homeAssistantName = c.assistantName.replace(/助手$/, "");
+    setText(".assistant-home-heading h2", `今天想让${homeAssistantName}帮你做什么？`);
     setText(".assistant-message-system .assistant-message-content", `你好！我是${c.assistantName}，有什么我可以帮您的吗？`);
   }
   if (c.poweredBy) setText(".assistant-footer", `POWERED BY ${c.poweredBy}`);
