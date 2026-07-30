@@ -232,7 +232,13 @@ app.post("/api/meeting-availability", async (req, res) => {
       signal: AbortSignal.timeout(15000),
     });
     const data = await response.json();
-    res.status(response.status).json(data);
+    const ui = data?.ui?.schema === "chency.meeting.v1" ? data.ui : null;
+    if (!ui) {
+      res.status(502).json({ success: false, message: "会议室查询结果格式不正确。" });
+      return;
+    }
+    // 只把展示所需的结构化卡片返回浏览器，不透传希会内部的会议/人员明细。
+    res.status(response.status).json({ ok: Boolean(data.ok), message: truncateText(data.message, 4000), ui });
   } catch (error) {
     console.error("Meeting availability proxy error:", error);
     res.status(502).json({ success: false, message: "会议室查询服务暂时不可用。" });
