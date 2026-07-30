@@ -590,6 +590,53 @@ function meetingQueryDateRange(text, now = new Date()) {
   return start && end ? { start: isoLocalDate(start), end: isoLocalDate(end), label } : null;
 }
 
+function meetingAvailabilityRequest(text, now = new Date()) {
+  const source = String(text || "").trim();
+  const availabilityIntent = /(?:会议室.{0,12}(?:空闲|可用|能用|还能?(?:预定|预订|预约)|可以(?:预定|预订|预约)|能订)|(?:空闲|可用|能用|还能?(?:预定|预订|预约)|可以(?:预定|预订|预约)|能订).{0,12}会议室)/.test(source);
+  if (!availabilityIntent) return null;
+
+  const range = meetingQueryDateRange(source, now);
+  let date = range && range.start === range.end ? range.start : "";
+  if (!date) {
+    const isoMatch = /(20\d{2})[-/.年](\d{1,2})[-/.月](\d{1,2})日?/.exec(source);
+    const monthDayMatch = /(\d{1,2})月(\d{1,2})日?/.exec(source);
+    if (isoMatch) {
+      date = `${isoMatch[1]}-${String(Number(isoMatch[2])).padStart(2, "0")}-${String(Number(isoMatch[3])).padStart(2, "0")}`;
+    } else if (monthDayMatch) {
+      date = `${now.getFullYear()}-${String(Number(monthDayMatch[1])).padStart(2, "0")}-${String(Number(monthDayMatch[2])).padStart(2, "0")}`;
+    } else {
+      date = isoLocalDate(now);
+    }
+  }
+
+  const period = /(?:下午|午后)/.test(source)
+    ? { start: "13:30", end: "17:30", mode: "window" }
+    : /(?:上午|早上)/.test(source)
+      ? { start: "09:00", end: "12:00", mode: "window" }
+      : { start: "", end: "", mode: "window" };
+
+  const explicitRange = /(上午|早上|下午|午后)?\s*(\d{1,2})(?:[:：](\d{2})|点(半|\d{1,2}分?)?)\s*(?:到|至|[-—~～])\s*(上午|早上|下午|午后)?\s*(\d{1,2})(?:[:：](\d{2})|点(半|\d{1,2}分?)?)/.exec(source);
+  if (explicitRange) {
+    const toClock = (periodName, hoursText, colonMinutes, pointMinutes, inheritedPeriod = "") => {
+      let hours = Number(hoursText);
+      const meridiem = periodName || inheritedPeriod;
+      if (/(下午|午后)/.test(meridiem) && hours < 12) hours += 12;
+      const minutes = colonMinutes !== undefined
+        ? Number(colonMinutes)
+        : pointMinutes === "半"
+          ? 30
+          : Number(String(pointMinutes || "0").replace("分", ""));
+      if (hours > 23 || minutes > 59) return "";
+      return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+    };
+    const start = toClock(explicitRange[1], explicitRange[2], explicitRange[3], explicitRange[4]);
+    const end = toClock(explicitRange[5], explicitRange[6], explicitRange[7], explicitRange[8], explicitRange[1]);
+    if (start && end && start < end) return { date, start, end, mode: "exact" };
+  }
+
+  return { date, ...period };
+}
+
 function meetingMatchesRange(meeting, range) {
   if (!range || !meeting?.date || meeting.date < range.start || meeting.date > range.end) return Boolean(!range);
   if (!range.futureOnly || meeting.date > range.start) return true;
@@ -697,6 +744,8 @@ function meetingStatusCopy(ui) {
     confirmation_error: ["操作未执行", "请重新发起", "shield-alert"],
     query_results: ["会议日程", `${Number(ui?.meta?.count || ui?.meetings?.length || 0)} 场`, "calendar-range"],
     query_empty: ["会议日程", "暂无会议", "calendar-search"],
+    availability_results: ["可用会议室", `${Number(ui?.meta?.count || ui?.rooms?.length || 0)} 间`, "door-open"],
+    availability_empty: ["可用会议室", "暂无空闲", "door-closed"],
   };
   return mapping[ui?.type] || ["会议助手", "", "calendar-days"];
 }
@@ -759,6 +808,37 @@ function renderMeetingList(ui) {
   `).join("");
 }
 
+function renderAvailabilityRooms(ui) {
+  const rooms = Array.isArray(ui.rooms) ? ui.rooms : [];
+  if (!rooms.length) return "";
+  const date = ui.filters?.date || rooms[0]?.freeSlots?.[0]?.date || "";
+  return `
+    <section class="meeting-availability">
+      ${date ? `<div class="meeting-day-heading"><span>${escapeHtml(formatMeetingDate(date))}</span><span>${rooms.length} 间可用</span></div>` : ""}
+      <div class="meeting-availability-list">
+        ${rooms.map((room) => {
+          const slots = Array.isArray(room.freeSlots) ? room.freeSlots : [];
+          const roomMeta = [
+            Number(room.capacity) > 0 ? `容纳 ${Number(room.capacity)} 人` : "",
+            Array.isArray(room.devices) ? room.devices.filter(Boolean).join(" · ") : "",
+          ].filter(Boolean).join(" · ");
+          return `
+            <article class="meeting-availability-room">
+              <div class="meeting-availability-room-heading">
+                <span class="meeting-availability-room-icon"><i data-lucide="door-open"></i></span>
+                <span><strong>${escapeHtml(room.name || "未命名会议室")}</strong>${roomMeta ? `<small>${escapeHtml(roomMeta)}</small>` : ""}</span>
+              </div>
+              <div class="meeting-availability-slots">
+                ${slots.map((slot) => `<span><i data-lucide="clock-3"></i>${escapeHtml(slot.start || "--:--")}–${escapeHtml(slot.end || "--:--")}</span>`).join("")}
+              </div>
+            </article>
+          `;
+        }).join("")}
+      </div>
+    </section>
+  `;
+}
+
 function renderMeetingUi(ui) {
   const [eyebrow, statusNote, icon] = meetingStatusCopy(ui);
   const status = ["pending", "success", "danger", "warning", "info"].includes(ui.status) ? ui.status : "info";
@@ -772,6 +852,7 @@ function renderMeetingUi(ui) {
     ? renderMeetingTicket(ui.meeting)
     : "";
   const meetingList = renderMeetingList(ui);
+  const availabilityRooms = renderAvailabilityRooms(ui);
   const isBookingPreview = ui.type === "booking_preview";
   const isCancelPreview = ui.type === "cancel_preview";
   const displayMessage = meetingDisplayMessage(ui);
@@ -800,6 +881,7 @@ function renderMeetingUi(ui) {
         ${displayMessage ? `<p class="meeting-ui-message">${escapeHtml(displayMessage)}</p>` : ""}
         ${mainMeeting}
         ${meetingList}
+        ${availabilityRooms}
         ${issues}
         ${suggestions}
         ${actions}
@@ -1707,6 +1789,9 @@ function renderAssistant() {
     let holdStructuredCardStream = Boolean(options.meetingAction)
       || /(会议|会议室|日程|行程|预定|预订|预约|退订|开会|取消|\bD\d{2}\b|报销记录|历史报销|报销历史)/i.test(text);
     const queryDateRange = meetingQueryDateRange(text);
+    const availabilityRequest = sendFiles.length === 0 && !options.meetingAction
+      ? meetingAvailabilityRequest(text)
+      : null;
     
     appendMessage("user", userMessageHTML);
     if (window.lucide) window.lucide.createIcons();
@@ -1719,6 +1804,23 @@ function renderAssistant() {
     setSessionControlsLocked(true);
     
     try {
+      if (availabilityRequest) {
+        const availabilityResponse = await fetch("/api/meeting-availability", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(availabilityRequest),
+        });
+        if (!availabilityResponse.ok) throw new Error("Meeting availability request failed");
+        const availabilityData = await availabilityResponse.json();
+        const availabilityUi = availabilityData?.ui || findMeetingUiPayload(availabilityData?.message);
+        if (!availabilityUi) throw new Error("Meeting availability response is missing UI data");
+        const finalReply = `${availabilityUi.message || availabilityData.message || ""}\n\n${MEETING_UI_START}${JSON.stringify(availabilityUi)}${MEETING_UI_END}`;
+        renderSystemReply(replyContentDiv, finalReply, true);
+        rememberMessage("system", finalReply);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+        return;
+      }
+
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

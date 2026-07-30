@@ -196,6 +196,49 @@ app.use("/invoice-proxy", (req, res) => {
   }
 });
 
+// 可用会议室查询直接调用希会，避免把“可预定”误解为“已有会议列表”。
+app.post("/api/meeting-availability", async (req, res) => {
+  const date = truncateText(req.body?.date, 10);
+  const start = truncateText(req.body?.start, 5);
+  const end = truncateText(req.body?.end, 5);
+  const mode = req.body?.mode === "exact" ? "exact" : "window";
+  const validDate = /^20\d{2}-\d{2}-\d{2}$/.test(date);
+  const validTime = (value) => /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+  if (!validDate || Boolean(start) !== Boolean(end) || (start && (!validTime(start) || !validTime(end) || start >= end))) {
+    res.status(400).json({ success: false, message: "会议室查询日期或时间格式不正确。" });
+    return;
+  }
+
+  const apiBase = String(process.env.CHENCY_MEET_API_URL || "").replace(/\/$/, "");
+  const apiSecret = process.env.CHENCY_MEET_AI_SECRET || "";
+  if (!apiBase || !apiSecret) {
+    res.status(500).json({ success: false, message: "会议室查询服务尚未配置。" });
+    return;
+  }
+
+  const keyword = start && end
+    ? `__availability__:${mode}:${start}-${end}`
+    : "__availability__:day";
+  try {
+    const response = await fetch(`${apiBase}/api/ai/meetings-query`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiSecret}`,
+        "X-Chency-User": req.headers["remote-user"] || "anonymous",
+        "X-Chency-Name": req.headers["remote-name"] || "",
+      },
+      body: JSON.stringify({ date, keyword, requesterUser: req.headers["remote-user"] || "anonymous" }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const data = await response.json();
+    res.status(response.status).json(data);
+  } catch (error) {
+    console.error("Meeting availability proxy error:", error);
+    res.status(502).json({ success: false, message: "会议室查询服务暂时不可用。" });
+  }
+});
+
 // Dify API 代理接口
 app.post("/api/chat", async (req, res) => {
   // 生产环境可以加上 authenticate，或者仅允许内网/有效 session 请求
