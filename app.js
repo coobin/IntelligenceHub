@@ -592,7 +592,7 @@ function meetingQueryDateRange(text, now = new Date()) {
 
 function meetingAvailabilityRequest(text, now = new Date()) {
   const source = String(text || "").trim();
-  const availabilityIntent = /(?:会议室.{0,12}(?:空闲|可用|能用|还能?(?:预定|预订|预约)|可以(?:预定|预订|预约)|能订)|(?:空闲|可用|能用|还能?(?:预定|预订|预约)|可以(?:预定|预订|预约)|能订).{0,12}会议室)/.test(source);
+  const availabilityIntent = /(?:会议室.{0,16}(?:空闲|有空|空着|空的|未占用|可用|可以用|能用|可使用|可以使用|能使用|还能?(?:预定|预订|预约)|可以(?:预定|预订|预约)|能订)|(?:空闲|有空|空着|空的|未占用|可用|可以用|能用|可使用|可以使用|能使用|还能?(?:预定|预订|预约)|可以(?:预定|预订|预约)|能订).{0,16}会议室)/.test(source);
   if (!availabilityIntent) return null;
 
   const range = meetingQueryDateRange(source, now);
