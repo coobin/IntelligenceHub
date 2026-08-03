@@ -196,6 +196,52 @@ app.use("/invoice-proxy", (req, res) => {
   }
 });
 
+// 对规则无法确定、但疑似会议空间相关的问法做轻量语义分类。
+// 模型只返回固定标签；分类失败时前端会继续走原有 Dify 会话，不影响其他能力。
+app.post("/api/meeting-intent", async (req, res) => {
+  const query = truncateText(req.body?.query, 300);
+  if (!query) {
+    res.status(400).json({ availability: false, classified: false });
+    return;
+  }
+
+  const intentApiUrl = process.env.DIFY_MEETING_INTENT_API_URL || process.env.DIFY_API_URL || "";
+  const intentApiKey = process.env.DIFY_MEETING_INTENT_API_KEY || "";
+  if (!intentApiUrl || !intentApiKey) {
+    res.status(503).json({ availability: false, classified: false });
+    return;
+  }
+
+  try {
+    const response = await fetch(intentApiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${intentApiKey}`,
+      },
+      body: JSON.stringify({
+        inputs: {},
+        query,
+        response_mode: "blocking",
+        conversation_id: "",
+        user: req.headers["remote-user"] || "anonymous",
+        auto_generate_name: false,
+      }),
+      signal: AbortSignal.timeout(6000),
+    });
+    const data = await response.json();
+    const label = String(data?.answer || "").trim().toUpperCase().match(/\b(AVAILABILITY|OTHER)\b/)?.[1] || "";
+    if (!response.ok || !label) {
+      res.status(502).json({ availability: false, classified: false });
+      return;
+    }
+    res.json({ availability: label === "AVAILABILITY", classified: true });
+  } catch (error) {
+    console.error("Meeting intent classifier error:", error);
+    res.status(502).json({ availability: false, classified: false });
+  }
+});
+
 // 可用会议室查询直接调用希会，避免把“可预定”误解为“已有会议列表”。
 app.post("/api/meeting-availability", async (req, res) => {
   const date = truncateText(req.body?.date, 10);

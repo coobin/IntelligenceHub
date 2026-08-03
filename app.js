@@ -590,10 +590,10 @@ function meetingQueryDateRange(text, now = new Date()) {
   return start && end ? { start: isoLocalDate(start), end: isoLocalDate(end), label } : null;
 }
 
-function meetingAvailabilityRequest(text, now = new Date()) {
+function meetingAvailabilityRequest(text, now = new Date(), assumeAvailability = false) {
   const source = String(text || "").trim();
   const availabilityIntent = /(?:会议室.{0,16}(?:空闲|有空|空着|空的|未占用|可用|可以用|能用|可使用|可以使用|能使用|还能?(?:预定|预订|预约)|可以(?:预定|预订|预约)|能订)|(?:空闲|有空|空着|空的|未占用|可用|可以用|能用|可使用|可以使用|能使用|还能?(?:预定|预订|预约)|可以(?:预定|预订|预约)|能订).{0,16}会议室)/.test(source);
-  if (!availabilityIntent) return null;
+  if (!assumeAvailability && !availabilityIntent) return null;
 
   const range = meetingQueryDateRange(source, now);
   let date = range && range.start === range.end ? range.start : "";
@@ -635,6 +635,12 @@ function meetingAvailabilityRequest(text, now = new Date()) {
   }
 
   return { date, ...period };
+}
+
+function shouldClassifyMeetingAvailability(text) {
+  const source = String(text || "").trim();
+  if (!source || source.length > 300 || /(?:发票|报销)/.test(source)) return false;
+  return /(?:会议室|会议场地|会场|开会|议事|讨论室|洽谈室|空房间|空间)/.test(source);
 }
 
 function meetingMatchesRange(meeting, range) {
@@ -1789,9 +1795,13 @@ function renderAssistant() {
     let holdStructuredCardStream = Boolean(options.meetingAction)
       || /(会议|会议室|日程|行程|预定|预订|预约|退订|开会|取消|\bD\d{2}\b|报销记录|历史报销|报销历史)/i.test(text);
     const queryDateRange = meetingQueryDateRange(text);
-    const availabilityRequest = sendFiles.length === 0 && !options.meetingAction
+    let availabilityRequest = sendFiles.length === 0 && !options.meetingAction
       ? meetingAvailabilityRequest(text)
       : null;
+    const shouldClassifyAvailability = !availabilityRequest
+      && sendFiles.length === 0
+      && !options.meetingAction
+      && shouldClassifyMeetingAvailability(text);
     
     appendMessage("user", userMessageHTML);
     if (window.lucide) window.lucide.createIcons();
@@ -1804,6 +1814,24 @@ function renderAssistant() {
     setSessionControlsLocked(true);
     
     try {
+      if (shouldClassifyAvailability) {
+        try {
+          const intentResponse = await fetch("/api/meeting-intent", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ query: text }),
+          });
+          if (intentResponse.ok) {
+            const intentData = await intentResponse.json();
+            if (intentData?.availability === true) {
+              availabilityRequest = meetingAvailabilityRequest(text, new Date(), true);
+            }
+          }
+        } catch (error) {
+          console.warn("Meeting availability intent fallback failed:", error);
+        }
+      }
+
       if (availabilityRequest) {
         const availabilityResponse = await fetch("/api/meeting-availability", {
           method: "POST",
