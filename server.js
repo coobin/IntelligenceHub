@@ -15,6 +15,8 @@ const DEFAULT_STATS = {
   pageViews: 0,
   clicks: {},
   daily: {},
+  dailyUV: {},
+  dailyUVNames: {},
   recent: []
 };
 const PUBLIC_ROOT_FILES = new Set([
@@ -92,13 +94,32 @@ function truncateText(value, maxLength) {
   return String(value || "").trim().slice(0, maxLength);
 }
 
+function decodeHeaderText(value) {
+  const text = truncateText(value, 120);
+  if (!text) return "";
+  try {
+    return decodeURIComponent(text);
+  } catch (err) {
+    return text;
+  }
+}
+
+function getVisitorIdentity(req) {
+  const userKey = truncateText(req.headers["remote-user"] || "匿名用户", 80);
+  const displayName = truncateText(
+    decodeHeaderText(req.headers["remote-name"] || req.headers["x-forwarded-user"]) || userKey,
+    80
+  );
+  return { userKey, displayName };
+}
+
 // 仅保留最近 STATS_RETENTION_DAYS 天的每日统计，避免 daily/dailyUV 无限增长
 const STATS_RETENTION_DAYS = 180;
 function pruneStats(stats) {
   const cutoff = new Date(Date.now() - STATS_RETENTION_DAYS * 86400000)
     .toISOString()
     .split("T")[0];
-  for (const map of [stats.daily, stats.dailyUV]) {
+  for (const map of [stats.daily, stats.dailyUV, stats.dailyUVNames]) {
     if (!map) continue;
     for (const day of Object.keys(map)) {
       if (day < cutoff) delete map[day]; // YYYY-MM-DD 可直接按字典序比较
@@ -486,27 +507,38 @@ app.post("/api/track", (req, res) => {
   }
 
   try {
-    const stats = readJsonFile(STATS_FILE, { ...DEFAULT_STATS, clicks: {}, daily: {}, dailyUV: {}, recent: [] });
+    const stats = readJsonFile(STATS_FILE, {
+      ...DEFAULT_STATS,
+      clicks: {},
+      daily: {},
+      dailyUV: {},
+      dailyUVNames: {},
+      recent: []
+    });
     const today = new Date().toISOString().split("T")[0];
     stats.clicks = stats.clicks || {};
     stats.daily = stats.daily || {};
     stats.dailyUV = stats.dailyUV || {};
+    stats.dailyUVNames = stats.dailyUVNames || {};
     stats.recent = stats.recent || [];
 
     if (type === "pageview") {
       stats.pageViews = (stats.pageViews || 0) + 1;
       stats.daily[today] = (stats.daily[today] || 0) + 1;
       
-      const userKey = req.headers["remote-user"] || "匿名用户";
+      const { userKey, displayName } = getVisitorIdentity(req);
       stats.dailyUV[today] = stats.dailyUV[today] || [];
       if (!stats.dailyUV[today].includes(userKey)) {
         stats.dailyUV[today].push(userKey);
       }
+      stats.dailyUVNames[today] = stats.dailyUVNames[today] || {};
+      stats.dailyUVNames[today][userKey] = displayName;
       
       // 记录最近访问
       const visitor = {
         time: new Date().toLocaleString("zh-CN", { hour12: false, timeZone: "Asia/Shanghai" }),
-        user: truncateText(userKey, 80), // 读取 Authelia 传来的用户名
+        user: userKey, // 稳定身份值，用于兼容旧数据和追踪去重
+        displayName, // 展示名称，云之家用户可能与 user 不同
         ip: truncateText(req.ip.replace("::ffff:", ""), 80),
         ua: truncateText(req.headers["user-agent"], 300)
       };

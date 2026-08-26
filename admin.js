@@ -164,7 +164,7 @@ function renderStats(stats) {
   `).join("") || '<p style="color:#94a3b8; text-align:center; padding:20px;">暂无点击数据</p>';
 
   renderAllEntryClicks(stats.clicks || {});
-  renderTopVisitors(stats.dailyUV);
+  renderTopVisitors(stats.dailyUV, stats.dailyUVNames);
   cachedDailyVisits = stats.daily || {};
   drawTrend();
 
@@ -296,7 +296,7 @@ function drawRecentVisitors() {
         ${visible.map(r => `
           <tr style="border-bottom: 1px solid #f8fafc;">
             <td style="padding: 12px 8px; color: #1e293b;">${escapeHtml(r.time)}</td>
-            <td style="padding: 12px 8px;"><span style="font-weight: 600; color: var(--admin-accent);">${escapeHtml(r.user || "未知")}</span></td>
+            <td style="padding: 12px 8px;"><span style="font-weight: 600; color: var(--admin-accent);">${escapeHtml(r.displayName || r.user || "未知")}</span></td>
             <td style="padding: 12px 8px;"><code style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px;">${escapeHtml(r.ip)}</code></td>
             <td style="padding: 12px 8px; color: #64748b; font-size: 12px;">${parseUA(r.ua)}</td>
           </tr>
@@ -378,17 +378,21 @@ function renderAllEntryClicks(clicks) {
   `;
 }
 
-function renderTopVisitors(dailyUV) {
+function renderTopVisitors(dailyUV, dailyUVNames) {
   const userDays = {};
+  const userNames = {};
   for (const day of Object.keys(dailyUV || {})) {
     for (const user of dailyUV[day] || []) {
       userDays[user] = (userDays[user] || 0) + 1;
+      const displayName = dailyUVNames?.[day]?.[user];
+      if (displayName) userNames[user] = displayName;
     }
   }
 
   cachedTopVisitors = Object.entries(userDays)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 20);
+  cachedTopVisitors = cachedTopVisitors.map(([user, days]) => [userNames[user] || user, days]);
 
   drawTopVisitors();
 }
