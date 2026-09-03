@@ -352,6 +352,21 @@ function stripThinkingContent(value, complete = false) {
   return text.replace(/^\s+/, "");
 }
 
+function assistantErrorMessage(data) {
+  const code = String(data?.code || "").toLowerCase();
+  const rawMessage = String(data?.message || "").trim();
+  if (code === "invalid_param" && /model\s+.+\s+not\s+exist/i.test(rawMessage)) {
+    return "犇犇助手暂时无法回复：AI 模型配置异常，请联系管理员。";
+  }
+  if (/quota|rate\s*limit|insufficient/i.test(rawMessage)) {
+    return "犇犇助手暂时无法回复：AI 服务额度或频率受限，请稍后再试。";
+  }
+  if (/timeout|terminated|network|connection|fetch/i.test(`${code} ${rawMessage}`)) {
+    return "犇犇助手暂时无法连接服务，请稍后再试。";
+  }
+  return "犇犇助手暂时无法回复，请稍后再试。";
+}
+
 function normalizeCitationResources(resources) {
   if (!Array.isArray(resources)) return [];
   const seen = new Set();
@@ -1874,9 +1889,11 @@ function renderAssistant() {
       let streamedExpenseUi = null;
       let streamedCitations = [];
       replyContentDiv.innerHTML = '<span class="assistant-typing" aria-label="思考中"><span class="assistant-typing-dot"></span><span class="assistant-typing-dot"></span><span class="assistant-typing-dot"></span></span>';
+      let streamError = null;
       
       let buffer = "";
-      while (true) {
+      let sseEventName = "";
+      sseLoop: while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         
@@ -1885,12 +1902,25 @@ function renderAssistant() {
         buffer = lines.pop(); // keep the last partial line
         
         for (const line of lines) {
+          if (line.startsWith("event:")) {
+            sseEventName = line.slice(6).trim();
+            continue;
+          }
           if (line.startsWith("data:")) {
             const dataStr = line.slice(5).trim();
             if (!dataStr || dataStr === "[DONE]") continue;
             try {
               const data = JSON.parse(dataStr);
-              if (data.event === "node_finished") {
+              const eventName = data.event || sseEventName;
+              sseEventName = "";
+              if (eventName === "error") {
+                streamError = data;
+                try {
+                  await reader.cancel();
+                } catch (error) {}
+                break sseLoop;
+              }
+              if (eventName === "node_finished") {
                 const nodeMeetingUi = findMeetingUiPayload(data.data?.outputs);
                 if (nodeMeetingUi) streamedMeetingUis.push(nodeMeetingUi);
                 const nodeExpenseUi = findExpenseUiPayload(data.data?.outputs);
@@ -1900,7 +1930,7 @@ function renderAssistant() {
                 holdStructuredCardStream = true;
                 replyContentDiv.innerHTML = '<span class="assistant-typing" aria-label="思考中"><span class="assistant-typing-dot"></span><span class="assistant-typing-dot"></span><span class="assistant-typing-dot"></span></span>';
               }
-              if (data.event === "message" || data.event === "agent_message") {
+              if (eventName === "message" || eventName === "agent_message") {
                 fullReply += data.answer || "";
                 if (!holdStructuredCardStream) {
                   const visibleStreamReply = stripThinkingContent(fullReply, false);
@@ -1911,7 +1941,7 @@ function renderAssistant() {
                   }
                 }
                 messagesEl.scrollTop = messagesEl.scrollHeight;
-              } else if (data.event === "message_end" || data.event === "agent_message_end") {
+              } else if (eventName === "message_end" || eventName === "agent_message_end") {
                 if (data.conversation_id) {
                   chatConversationId = data.conversation_id;
                 }
@@ -1920,6 +1950,14 @@ function renderAssistant() {
             } catch (e) {}
           }
         }
+      }
+
+      if (streamError) {
+        const errorMessage = assistantErrorMessage(streamError);
+        replyContentDiv.textContent = errorMessage;
+        rememberMessage("system", errorMessage);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+        return;
       }
 
       const cleanFullReply = stripThinkingContent(fullReply, true);
@@ -1938,6 +1976,13 @@ function renderAssistant() {
       const finalReply = streamedCitations.length
         ? `${baseFinalReply}\n\n${CITATIONS_UI_START}${JSON.stringify({ schema: "chency.citations.v1", resources: streamedCitations })}${CITATIONS_UI_END}`
         : baseFinalReply;
+      if (!finalReply.trim()) {
+        const emptyMessage = "犇犇助手没有返回有效内容，请稍后重试。";
+        replyContentDiv.textContent = emptyMessage;
+        rememberMessage("system", emptyMessage);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+        return;
+      }
       renderSystemReply(replyContentDiv, finalReply, true);
       rememberMessage("system", finalReply);
       messagesEl.scrollTop = messagesEl.scrollHeight;

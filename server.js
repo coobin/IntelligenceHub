@@ -318,9 +318,22 @@ app.post("/api/chat", async (req, res) => {
   const remoteUser = req.headers["remote-user"] || "anonymous";
   const DIFY_API_URL = process.env.DIFY_API_URL || "";
   const DIFY_API_KEY = process.env.DIFY_API_KEY || "";
+  const upstreamController = new AbortController();
+  let clientDisconnected = false;
+  const abortUpstream = () => {
+    if (!res.writableEnded && !res.destroyed) {
+      clientDisconnected = true;
+      upstreamController.abort();
+    }
+  };
+
+  req.on("aborted", abortUpstream);
+  res.on("close", abortUpstream);
   
   if (!DIFY_API_KEY) {
     res.status(500).json({ success: false, message: "Server configuration error: DIFY_API_KEY is missing." });
+    req.off("aborted", abortUpstream);
+    res.off("close", abortUpstream);
     return;
   }
 
@@ -359,7 +372,8 @@ app.post("/api/chat", async (req, res) => {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${DIFY_API_KEY}`
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      signal: upstreamController.signal
     });
 
     res.writeHead(response.status, {
@@ -369,16 +383,69 @@ app.post("/api/chat", async (req, res) => {
     });
 
     if (response.body) {
+      let sseBuffer = "";
+      let upstreamErrorSeen = false;
       for await (const chunk of response.body) {
+        if (res.destroyed) break;
         res.write(chunk);
+
+        // Dify may send an SSE error event with HTTP 200 and then leave the
+        // stream open. Stop forwarding as soon as that terminal error is seen
+        // so the proxy does not wait for an upstream body timeout.
+        sseBuffer += Buffer.from(chunk).toString("utf8");
+        const blocks = sseBuffer.split(/\n\n/);
+        sseBuffer = blocks.pop() || "";
+        for (const block of blocks) {
+          const dataLine = block.split(/\r?\n/).find((line) => line.startsWith("data:"));
+          if (!dataLine) continue;
+          const dataText = dataLine.slice(5).trim();
+          if (!dataText || dataText === "[DONE]") continue;
+          try {
+            const data = JSON.parse(dataText);
+            if (data?.event === "error") {
+              upstreamErrorSeen = true;
+              break;
+            }
+          } catch (error) {
+            // A JSON payload can be split across chunks; the next chunk will
+            // complete it, so leave it in the buffer path rather than failing.
+          }
+        }
+        if (upstreamErrorSeen) {
+          try {
+            await response.body.cancel();
+          } catch (error) {}
+          break;
+        }
       }
-      res.end();
+      if (!res.writableEnded && !res.destroyed) res.end();
     } else {
-      res.end();
+      if (!res.writableEnded && !res.destroyed) res.end();
     }
   } catch (error) {
+    if (clientDisconnected || upstreamController.signal.aborted) return;
     console.error("Dify proxy error:", error);
-    res.status(500).json({ success: false, message: "Dify API proxy failed" });
+    if (res.headersSent) {
+      // Headers are already committed as SSE. Send a terminal SSE error
+      // instead of trying to change the status code and crashing Node with
+      // ERR_HTTP_HEADERS_SENT.
+      if (!res.writableEnded && !res.destroyed) {
+        try {
+          res.write(`event: error\n\ndata: ${JSON.stringify({
+            event: "error",
+            code: "proxy_error",
+            status: 502,
+            message: "助手服务暂时不可用，请稍后再试。"
+          })}\n\n`);
+          res.end();
+        } catch (writeError) {}
+      }
+    } else {
+      res.status(502).json({ success: false, message: "助手服务暂时不可用，请稍后再试。" });
+    }
+  } finally {
+    req.off("aborted", abortUpstream);
+    res.off("close", abortUpstream);
   }
 });
 
