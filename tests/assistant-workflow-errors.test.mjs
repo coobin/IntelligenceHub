@@ -44,6 +44,7 @@ async function consume(events, { split = false } = {}) {
     replyContentDiv: displayed,
     messagesEl: { scrollTop: 0, scrollHeight: 1 },
     holdStructuredCardStream: false,
+    expectsInvoiceConfirmation: false,
     findMeetingUiPayload: () => null,
     findExpenseUiPayload: () => null,
     normalizeCitationResources: () => [],

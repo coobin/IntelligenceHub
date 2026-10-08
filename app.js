@@ -352,6 +352,20 @@ function stripThinkingContent(value, complete = false) {
   return text.replace(/^\s+/, "");
 }
 
+function invoiceConfirmationQuery(text, history, context = {}) {
+  if (context.hasFiles || context.meetingAction) return text;
+  const normalized = String(text || "").trim().replace(/[。.!！\s]+$/, "");
+  if (/^(确认报销|提交报销)$/.test(normalized)) return "确认报销";
+  if (!/^(确认|确定|确认无误)$/.test(normalized)) return text;
+  for (let index = history.length - 1; index >= 0; index -= 1) {
+    if (history[index]?.role !== "system") continue;
+    const reply = stripThinkingContent(history[index].text, true);
+    if (/已确认提交报销|这张发票已提交报销|已放弃本次报销/.test(reply)) return text;
+    if (/初步校验通过/.test(reply) && /发票号[：:]/.test(reply)) return "确认报销";
+  }
+  return text;
+}
+
 function assistantStreamError(eventName, data) {
   if (eventName === "error") return data;
   if (eventName === "workflow_finished" && data.data?.status === "failed") {
@@ -379,6 +393,28 @@ function assistantErrorMessage(data) {
     return "犇犇助手处理失败，请联系管理员。";
   }
   return "犇犇助手暂时无法回复，请稍后再试。";
+}
+
+function findInvoiceDecisionPayload(value, depth = 0) {
+  if (value == null || depth > 6) return null;
+  if (typeof value === "string") {
+    try {
+      return findInvoiceDecisionPayload(JSON.parse(value), depth + 1);
+    } catch (error) {
+      return null;
+    }
+  }
+  if (typeof value === "object") {
+    if (["ok", "error"].includes(value.status) && typeof value.message === "string"
+      && (value.status !== "ok" || (Number.isInteger(value.invoice_id) && value.invoice_id > 0))) {
+      return value;
+    }
+    for (const item of Object.values(value)) {
+      const found = findInvoiceDecisionPayload(item, depth + 1);
+      if (found) return found;
+    }
+  }
+  return null;
 }
 
 function normalizeCitationResources(resources) {
@@ -1750,7 +1786,7 @@ function renderAssistant() {
 
   const sendMessage = async (options = {}) => {
     if (requestInFlight) return;
-    const continueCurrentSession = Boolean(options.meetingAction || pendingMeetingAction || pendingMeetingContinuation);
+    let continueCurrentSession = Boolean(options.meetingAction || pendingMeetingAction || pendingMeetingContinuation);
     const typedText = inputEl.value.trim();
     let text = options.queryText !== undefined ? options.queryText : typedText;
     let displayText = options.displayText !== undefined ? options.displayText : typedText;
@@ -1792,6 +1828,13 @@ function renderAssistant() {
         text = `${pendingMeetingContinuation.query}\n补充信息：${typedText}`;
       }
     }
+
+    text = invoiceConfirmationQuery(text, chatHistory, {
+      hasFiles: uploadedFiles.length > 0,
+      meetingAction: options.meetingAction || pendingMeetingAction || pendingMeetingContinuation,
+    });
+    const expectsInvoiceConfirmation = text === "确认报销" && uploadedFiles.length === 0 && !options.meetingAction;
+    continueCurrentSession = continueCurrentSession || expectsInvoiceConfirmation;
 
     if (!text && uploadedFiles.length === 0) return;
 
@@ -1901,6 +1944,7 @@ function renderAssistant() {
       let fullReply = "";
       const streamedMeetingUis = [];
       let streamedExpenseUi = null;
+      let streamedInvoiceDecision = null;
       let streamedCitations = [];
       replyContentDiv.innerHTML = '<span class="assistant-typing" aria-label="思考中"><span class="assistant-typing-dot"></span><span class="assistant-typing-dot"></span><span class="assistant-typing-dot"></span></span>';
       let streamError = null;
@@ -1940,8 +1984,11 @@ function renderAssistant() {
                 if (nodeMeetingUi) streamedMeetingUis.push(nodeMeetingUi);
                 const nodeExpenseUi = findExpenseUiPayload(data.data?.outputs);
                 if (nodeExpenseUi) streamedExpenseUi = nodeExpenseUi;
+                if (data.data?.title === "confirmLatestInvoice") {
+                  streamedInvoiceDecision = findInvoiceDecisionPayload(data.data.outputs);
+                }
               }
-              if (streamedMeetingUis.length || streamedExpenseUi) {
+              if (streamedMeetingUis.length || streamedExpenseUi || streamedInvoiceDecision) {
                 holdStructuredCardStream = true;
                 replyContentDiv.innerHTML = '<span class="assistant-typing" aria-label="思考中"><span class="assistant-typing-dot"></span><span class="assistant-typing-dot"></span><span class="assistant-typing-dot"></span></span>';
               }
@@ -1975,6 +2022,14 @@ function renderAssistant() {
         return;
       }
 
+      if (expectsInvoiceConfirmation && !streamedInvoiceDecision) {
+        const errorMessage = "报销确认未完成，请重试或联系管理员。";
+        replyContentDiv.textContent = errorMessage;
+        rememberMessage("system", errorMessage);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+        return;
+      }
+
       const cleanFullReply = stripThinkingContent(fullReply, true);
       const replyMeetingUi = findMeetingUiPayload(cleanFullReply);
       const selectedMeetingUi = selectMeetingUiCandidate(
@@ -1983,7 +2038,9 @@ function renderAssistant() {
       );
       const finalMeetingUi = filterMeetingUiByDateRange(selectedMeetingUi, queryDateRange);
       const finalExpenseUi = findExpenseUiPayload(cleanFullReply) || streamedExpenseUi;
-      const baseFinalReply = finalExpenseUi
+      const baseFinalReply = streamedInvoiceDecision
+        ? streamedInvoiceDecision.message
+        : finalExpenseUi
         ? `${finalExpenseUi.message || ""}\n\n${EXPENSE_UI_START}${JSON.stringify(finalExpenseUi)}${EXPENSE_UI_END}`
         : finalMeetingUi
         ? `${finalMeetingUi.message || ""}\n\n${MEETING_UI_START}${JSON.stringify(finalMeetingUi)}${MEETING_UI_END}`
@@ -2003,7 +2060,7 @@ function renderAssistant() {
       messagesEl.scrollTop = messagesEl.scrollHeight;
 
       // 合规回执后追加「确认报销 / 放弃」按钮
-      if (/初步校验通过/.test(fullReply)) {
+      if (!streamedInvoiceDecision && /初步校验通过/.test(cleanFullReply)) {
         const bar = document.createElement("div");
         bar.style.cssText = "margin-top:10px;display:flex;gap:8px;";
         const cbtn = document.createElement("button");
@@ -2019,12 +2076,19 @@ function renderAssistant() {
           cbtn.style.opacity = "0.6"; rbtn.style.opacity = "0.6";
           cbtn.style.cursor = "default"; rbtn.style.cursor = "default";
         };
-        cbtn.addEventListener("click", () => {
-          if (cbtn.disabled) return;
+        cbtn.addEventListener("click", async () => {
+          if (cbtn.disabled || requestInFlight) return;
           lockBoth();
-          cbtn.textContent = "已提交确认";
-          inputEl.value = "确认";
-          sendMessage();
+          cbtn.textContent = "正在确认...";
+          const result = await sendMessage({ queryText: "确认报销", displayText: "确认报销" });
+          if (result?.invoiceConfirmed) {
+            cbtn.textContent = "已确认报销";
+          } else {
+            cbtn.disabled = false; rbtn.disabled = false;
+            cbtn.style.opacity = "1"; rbtn.style.opacity = "1";
+            cbtn.style.cursor = "pointer"; rbtn.style.cursor = "pointer";
+            cbtn.textContent = "重试确认";
+          }
         });
         rbtn.addEventListener("click", async () => {
           if (rbtn.disabled) return;
@@ -2052,6 +2116,7 @@ function renderAssistant() {
         replyContentDiv.appendChild(bar);
         messagesEl.scrollTop = messagesEl.scrollHeight;
       }
+      return { invoiceConfirmed: streamedInvoiceDecision?.status === "ok" };
     } catch (err) {
       replyContentDiv.textContent = "抱歉，请求出错，请稍后再试。";
       rememberMessage("system", replyContentDiv.textContent);
