@@ -352,10 +352,21 @@ function stripThinkingContent(value, complete = false) {
   return text.replace(/^\s+/, "");
 }
 
+function assistantStreamError(eventName, data) {
+  if (eventName === "error") return data;
+  if (eventName === "workflow_finished" && data.data?.status === "failed") {
+    return { code: "workflow_failed", message: data.data.error || "工作流处理失败" };
+  }
+  return null;
+}
+
 function assistantErrorMessage(data) {
   const code = String(data?.code || "").toLowerCase();
   const rawMessage = String(data?.message || "").trim();
-  if (code === "invalid_param" && /model\s+.+\s+not\s+exist/i.test(rawMessage)) {
+  if (/Invalid serial index/i.test(rawMessage)) {
+    return "犇犇助手未能处理上传的附件，请联系管理员。";
+  }
+  if (/model\s+.+\s+not\s+exist/i.test(rawMessage)) {
     return "犇犇助手暂时无法回复：AI 模型配置异常，请联系管理员。";
   }
   if (/quota|rate\s*limit|insufficient/i.test(rawMessage)) {
@@ -363,6 +374,9 @@ function assistantErrorMessage(data) {
   }
   if (/timeout|terminated|network|connection|fetch/i.test(`${code} ${rawMessage}`)) {
     return "犇犇助手暂时无法连接服务，请稍后再试。";
+  }
+  if (code === "workflow_failed") {
+    return "犇犇助手处理失败，请联系管理员。";
   }
   return "犇犇助手暂时无法回复，请稍后再试。";
 }
@@ -1913,8 +1927,9 @@ function renderAssistant() {
               const data = JSON.parse(dataStr);
               const eventName = data.event || sseEventName;
               sseEventName = "";
-              if (eventName === "error") {
-                streamError = data;
+              const eventError = assistantStreamError(eventName, data);
+              if (eventError) {
+                streamError = eventError;
                 try {
                   await reader.cancel();
                 } catch (error) {}
