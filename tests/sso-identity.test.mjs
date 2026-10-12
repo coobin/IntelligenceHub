@@ -36,6 +36,18 @@ test("employee identity stays consistent across CIH chat, uploads and invoice pr
       res.setHeader("Content-Type", "text/event-stream");
       return res.end('data: {"event":"message_end","conversation_id":"new-conversation"}\n\n');
     }
+    if (req.url.startsWith("/v1/messages?")) {
+      const conversation = new URL(req.url, "http://upstream.invalid").searchParams.get("conversation_id");
+      if (conversation === "legacy-conversation") {
+        res.statusCode = 404;
+        return res.end('{"code":"not_found","message":"Conversation Not Exists."}');
+      }
+      if (conversation === "unavailable") {
+        res.statusCode = 503;
+        return res.end('{"code":"unavailable"}');
+      }
+      return res.end('{"data":[]}');
+    }
     if (req.url === "/v1/files/upload") return res.end('{"id":"file-1"}');
     if (req.url === "/v1/audio-to-text") return res.end('{"text":"查询通讯费"}');
     res.end('{"ok":true}');
@@ -111,17 +123,27 @@ test("employee identity stays consistent across CIH chat, uploads and invoice pr
         assert.equal(calls.filter((call) => call.url === "/v1/chat-messages").length, before);
       }
     });
-    await t.test("old provider conversation retries once as employee, ordinary failures do not retry", async () => {
+    await t.test("old provider conversation is checked before workflow execution; valid employee conversations continue", async () => {
       const before = calls.filter((call) => call.url === "/v1/chat-messages").length;
       assert.equal((await chat(cloudHeaders, { conversation_id: "legacy-conversation" })).status, 200);
       const newCalls = calls.filter((call) => call.url === "/v1/chat-messages").slice(before).map((call) => JSON.parse(call.body));
-      assert.equal(newCalls.length, 2);
-      assert.equal(newCalls[0].conversation_id, "legacy-conversation");
-      assert.equal(newCalls[1].conversation_id, "");
+      assert.equal(newCalls.length, 1);
+      assert.equal(newCalls[0].conversation_id, "");
       assert.ok(newCalls.every((call) => call.user === "employee"));
+      const ownership = calls.find((call) => call.url.startsWith("/v1/messages?"));
+      assert.equal(new URL(ownership.url, "http://upstream.invalid").searchParams.get("user"), "employee");
+      assert.equal((await chat(cloudHeaders, { conversation_id: "employee-conversation" })).status, 200);
+      assert.equal(JSON.parse(calls.at(-1).body).conversation_id, "employee-conversation");
       const ordinaryBefore = calls.length;
       assert.equal((await chat({ "remote-user": "employee" }, { conversation_id: "legacy-conversation" })).status, 404);
       assert.equal(calls.length, ordinaryBefore + 1);
+    });
+    await t.test("ownership service outage does not start or repeat a workflow", async () => {
+      const before = calls.filter((call) => call.url === "/v1/chat-messages").length;
+      const response = await chat(cloudHeaders, { conversation_id: "unavailable" });
+      assert.equal(response.status, 502);
+      assert.match((await response.json()).message, /新建对话/);
+      assert.equal(calls.filter((call) => call.url === "/v1/chat-messages").length, before);
     });
   } finally {
     child.kill("SIGTERM");

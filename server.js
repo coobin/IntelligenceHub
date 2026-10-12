@@ -409,7 +409,31 @@ app.post("/api/chat", async (req, res) => {
       current_time: new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })
     };
 
-    const sendToDify = () => fetch(DIFY_API_URL, {
+    // Dify can open an SSE stream and keep sending pings when an old provider
+    // conversation belongs to a different end user. Check ownership through
+    // the non-streaming messages API before starting any workflow.
+    if (req.assistantIdentity && payload.conversation_id) {
+      const messagesUrl = new URL(DIFY_API_URL.replace("/chat-messages", "/messages"));
+      messagesUrl.searchParams.set("conversation_id", payload.conversation_id);
+      messagesUrl.searchParams.set("user", remoteUser);
+      messagesUrl.searchParams.set("limit", "1");
+      const ownership = await fetch(messagesUrl, {
+        headers: { "Authorization": `Bearer ${DIFY_API_KEY}` },
+        signal: AbortSignal.any([upstreamController.signal, AbortSignal.timeout(8000)]),
+      });
+      if (!ownership.ok) {
+        const error = await ownership.json().catch(() => ({}));
+        if (ownership.status === 404 && ["not_found", "conversation_not_exists"].includes(error.code)) {
+          payload.conversation_id = "";
+        } else {
+          return res.status(502).json({ success: false, message: "无法核验当前对话，请新建对话后重试。" });
+        }
+      } else {
+        await ownership.body?.cancel();
+      }
+    }
+
+    const response = await fetch(DIFY_API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -418,17 +442,6 @@ app.post("/api/chat", async (req, res) => {
       body: JSON.stringify(payload),
       signal: upstreamController.signal
     });
-    let response = await sendToDify();
-    // Already-open Cloud Home pages can carry conversations owned by the old
-    // provider ID. Retry only a not-found/ownership rejection, before workflow
-    // execution; subsequent SSE events replace the stored conversation ID.
-    if (req.assistantIdentity && payload.conversation_id && [400, 404].includes(response.status)) {
-      const error = await response.clone().json().catch(() => ({}));
-      if (error.code === "conversation_not_exists") {
-        payload.conversation_id = "";
-        response = await sendToDify();
-      }
-    }
 
     res.writeHead(response.status, {
       "Content-Type": response.headers.get("Content-Type") || "text/event-stream",
