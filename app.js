@@ -1937,7 +1937,10 @@ function renderAssistant() {
         })
       });
       
-      if (!response.ok) throw new Error("API request failed");
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || "助手请求失败，请稍后重试。");
+      }
       
       const reader = response.body.getReader();
       const decoder = new TextDecoder("utf-8");

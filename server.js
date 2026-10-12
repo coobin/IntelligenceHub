@@ -159,6 +159,45 @@ const ADMIN_REMOTE_USER = process.env.ADMIN_REMOTE_USER || "admin";
 
 app.use(express.json());
 
+// Cloud Home provider IDs differ from employee UIDs used by business tools
+// and Dify file ownership. Resolve verified headers through the existing
+// invoice directory connection before invoking those tools.
+app.use(["/api/chat", "/api/check-auth", "/api/meeting-intent", "/api/meeting-availability", "/invoice-proxy"], async (req, res, next) => {
+  const providerUser = req.headers["remote-user"] || "";
+  if (!/^[0-9a-f]{24}$/i.test(providerUser)) return next();
+  const identityHeaders = { "Remote-User": providerUser };
+  for (const header of ["remote-name", "remote-email"]) {
+    if (req.headers[header]) identityHeaders[header] = req.headers[header];
+  }
+  try {
+    const host = process.env.INVOICE_HOST || "127.0.0.1";
+    const invoicePort = Number(process.env.INVOICE_PORT) || 8082;
+    const response = await fetch(`http://${host}:${invoicePort}/api/auth/identity`, {
+      headers: identityHeaders,
+      signal: AbortSignal.timeout(8000),
+    });
+    const identity = await response.json();
+    if (!response.ok) {
+      return res.status([401, 409, 503].includes(response.status) ? response.status : 502).json({
+        success: false,
+        message: typeof identity.detail === "string" ? identity.detail : "员工身份核验失败，请稍后重试。",
+      });
+    }
+    if (!identity.username || !identity.name || /^[0-9a-f]{24}$/i.test(identity.username)) {
+      throw new Error("Directory returned an invalid employee identity");
+    }
+    req.assistantIdentity = identity;
+    next();
+  } catch (error) {
+    console.error("Employee identity resolution failed:", error.name);
+    res.status(503).json({ success: false, message: "员工身份核验服务暂时不可用，请稍后重试。" });
+  }
+});
+
+function assistantUser(req) {
+  return req.assistantIdentity?.username || req.headers["remote-user"] || "anonymous";
+}
+
 import http from "http";
 
 // 鉴权中间件
@@ -176,6 +215,10 @@ const authenticate = (req, res, next) => {
 app.use("/invoice-proxy", (req, res) => {
   const targetPath = req.originalUrl.replace(/^\/invoice-proxy/, "");
   const headers = { ...req.headers };
+  if (req.assistantIdentity) {
+    headers["remote-user"] = req.assistantIdentity.username;
+    headers["remote-name"] = encodeURIComponent(req.assistantIdentity.name);
+  }
   delete headers.host;
   delete headers.origin;
   delete headers.referer;
@@ -245,7 +288,7 @@ app.post("/api/meeting-intent", async (req, res) => {
         query,
         response_mode: "blocking",
         conversation_id: "",
-        user: req.headers["remote-user"] || "anonymous",
+        user: assistantUser(req),
         auto_generate_name: false,
       }),
       signal: AbortSignal.timeout(6000),
@@ -292,10 +335,10 @@ app.post("/api/meeting-availability", async (req, res) => {
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${apiSecret}`,
-        "X-Chency-User": req.headers["remote-user"] || "anonymous",
+        "X-Chency-User": assistantUser(req),
         "X-Chency-Name": req.headers["remote-name"] || "",
       },
-      body: JSON.stringify({ date, keyword, requesterUser: req.headers["remote-user"] || "anonymous" }),
+      body: JSON.stringify({ date, keyword, requesterUser: assistantUser(req) }),
       signal: AbortSignal.timeout(15000),
     });
     const data = await response.json();
@@ -315,7 +358,7 @@ app.post("/api/meeting-availability", async (req, res) => {
 // Dify API 代理接口
 app.post("/api/chat", async (req, res) => {
   // 生产环境可以加上 authenticate，或者仅允许内网/有效 session 请求
-  const remoteUser = req.headers["remote-user"] || "anonymous";
+  const remoteUser = assistantUser(req);
   const DIFY_API_URL = process.env.DIFY_API_URL || "";
   const DIFY_API_KEY = process.env.DIFY_API_KEY || "";
   const upstreamController = new AbortController();
@@ -344,7 +387,7 @@ app.post("/api/chat", async (req, res) => {
     };
     
     // 中文名转换逻辑：仅使用 Authelia 注入的 remote-name 头
-    let remoteNameRaw = req.headers["remote-name"] || req.headers["x-forwarded-user"] || "";
+    let remoteNameRaw = req.assistantIdentity ? encodeURIComponent(req.assistantIdentity.name) : req.headers["remote-name"] || req.headers["x-forwarded-user"] || "";
     let chineseName = remoteUser;
 
     if (remoteNameRaw) {
@@ -366,7 +409,7 @@ app.post("/api/chat", async (req, res) => {
       current_time: new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })
     };
 
-    const response = await fetch(DIFY_API_URL, {
+    const sendToDify = () => fetch(DIFY_API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -375,6 +418,17 @@ app.post("/api/chat", async (req, res) => {
       body: JSON.stringify(payload),
       signal: upstreamController.signal
     });
+    let response = await sendToDify();
+    // Already-open Cloud Home pages can carry conversations owned by the old
+    // provider ID. Retry only a not-found/ownership rejection, before workflow
+    // execution; subsequent SSE events replace the stored conversation ID.
+    if (req.assistantIdentity && payload.conversation_id && [400, 404].includes(response.status)) {
+      const error = await response.clone().json().catch(() => ({}));
+      if (error.code === "conversation_not_exists") {
+        payload.conversation_id = "";
+        response = await sendToDify();
+      }
+    }
 
     res.writeHead(response.status, {
       "Content-Type": response.headers.get("Content-Type") || "text/event-stream",
@@ -451,7 +505,7 @@ app.post("/api/chat", async (req, res) => {
 
 // Dify 文件上传代理
 app.post("/api/chat/upload", chatUpload.single("file"), async (req, res) => {
-  const remoteUser = req.headers["remote-user"] || req.headers["x-forwarded-user"] || "anonymous";
+  const remoteUser = assistantUser(req);
   const DIFY_API_URL = process.env.DIFY_API_URL || "";
   const DIFY_API_KEY = process.env.DIFY_API_KEY || "";
   
@@ -496,7 +550,7 @@ app.post("/api/chat/upload", chatUpload.single("file"), async (req, res) => {
 });
 // Dify 语音转文字代理 (audio-to-text)
 app.post("/api/chat/audio", audioUpload.single("file"), async (req, res) => {
-  const remoteUser = req.headers["remote-user"] || req.headers["x-forwarded-user"] || "anonymous";
+  const remoteUser = assistantUser(req);
   const DIFY_API_URL = process.env.DIFY_API_URL || "";
   const DIFY_API_KEY = process.env.DIFY_API_KEY || "";
 
@@ -563,7 +617,7 @@ app.get("/api/check-auth", (req, res) => {
   
   // 如果是 SSO 指定用户，则视为已登录
   const authenticated = remoteUser === ADMIN_REMOTE_USER;
-  res.json({ authenticated, user: remoteUser });
+  res.json({ authenticated, user: req.assistantIdentity?.username || remoteUser });
 });
 
 // 统计接口 (公开)
