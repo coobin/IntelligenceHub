@@ -647,6 +647,30 @@ app.put("/api/catalog/order", authenticate, (req, res) => {
   }
 });
 
+// 项目没有固定 ID：核对打开排序窗口时的项目列表，再按索引重排当前数据。
+app.put("/api/catalog/item-order", authenticate, (req, res) => {
+  const { sectionId, expectedItems, order } = req.body || {};
+  if (typeof sectionId !== "string" || !Array.isArray(expectedItems) || !Array.isArray(order)
+    || order.length !== expectedItems.length || new Set(order).size !== order.length
+    || !order.every((index) => Number.isInteger(index) && index >= 0 && index < order.length)) {
+    return res.status(400).json({ success: false, message: "项目顺序格式不正确" });
+  }
+
+  try {
+    const catalog = JSON.parse(fs.readFileSync(CATALOG_FILE, "utf8"));
+    const sections = catalog.sections.filter((section) => section.id === sectionId);
+    if (sections.length !== 1 || JSON.stringify(sections[0].items) !== JSON.stringify(expectedItems)) {
+      return res.status(409).json({ success: false, message: "模块内容已更新，请刷新后重新排序" });
+    }
+    const section = sections[0];
+    section.items = order.map((index) => section.items[index]);
+    writeJsonFile(CATALOG_FILE, catalog);
+    res.json(catalog);
+  } catch {
+    res.status(500).json({ success: false, message: "无法保存项目顺序" });
+  }
+});
+
 // 检查登录状态
 app.get("/api/check-auth", (req, res) => {
   const remoteUser = req.headers["remote-user"] || "";

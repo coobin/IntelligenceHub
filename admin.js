@@ -453,12 +453,14 @@ function renderAdmin() {
           <h2 style="margin:0">${escapeHtml(section.title)} <small style="color:#94a3b8; font-weight:normal; font-size:14px;">(${escapeHtml(section.id)})</small></h2>
           <p style="margin:4px 0 0; color:#64748b; font-size:13px;">${escapeHtml(section.description || "无描述")}</p>
         </div>
-        <div style="display:flex; gap:8px;">
+        <div class="editor-actions">
+          <button class="btn btn-ghost" type="button" data-action="sort-items" data-section-index="${sIndex}" ${section.items.length < 2 ? "disabled" : ""}>项目排序</button>
           <button class="btn btn-ghost" data-action="edit-section" data-section-index="${sIndex}">编辑分类</button>
           <button class="btn btn-danger" data-action="delete-section" data-section-index="${sIndex}">删除分类</button>
           <button class="btn btn-primary" data-action="add-item" data-section-id="${escapeAttribute(section.id)}">+ 添加项目</button>
         </div>
       </div>
+      <p class="catalog-sort-notice" id="itemSortNotice-${sIndex}" role="status"></p>
       <div class="items-list">
         <div class="item-row" style="font-weight:600; color:#94a3b8; font-size:12px; border-bottom:1px solid #e2e8f0; padding-bottom:8px;">
           <div>名称</div>
@@ -488,91 +490,118 @@ function renderAdmin() {
 }
 
 const moduleSortButton = document.getElementById("openModuleSort");
-const moduleSortDialog = document.getElementById("moduleSortDialog");
-const moduleSortList = document.getElementById("moduleSortList");
-const moduleSortStatus = document.getElementById("moduleSortStatus");
-const moduleSortNotice = document.getElementById("moduleSortNotice");
-const moduleSortSave = document.getElementById("saveModuleSort");
-const moduleSortCancel = document.getElementById("cancelModuleSort");
-let moduleSortDraft = [];
-let moduleSortSaving = false;
+const catalogSortDialog = document.getElementById("catalogSortDialog");
+const catalogSortList = document.getElementById("catalogSortList");
+const catalogSortStatus = document.getElementById("catalogSortStatus");
+const catalogSortNotice = document.getElementById("catalogSortNotice");
+const catalogSortSave = document.getElementById("saveCatalogSort");
+const catalogSortCancel = document.getElementById("cancelCatalogSort");
+let sortDraft;
+let sortSaving = false;
 
-function renderModuleSort() {
-  moduleSortList.innerHTML = moduleSortDraft.map((section, index) => {
-    const title = section.title || section.id;
+function renderCatalogSort() {
+  const { section, entries, order } = sortDraft;
+  catalogSortList.innerHTML = order.map((originalIndex, index) => {
+    const entry = entries[originalIndex];
+    const title = section ? entry.name : entry.title || entry.id;
     return `
       <li>
-        <div class="module-sort-row">
+        <div class="catalog-sort-row">
           <span>${escapeHtml(title)}</span>
-          <div class="module-sort-moves">
+          <div class="catalog-sort-moves">
             <button type="button" class="btn btn-ghost" data-index="${index}" data-step="-1"
-              aria-label="上移 ${escapeAttribute(title)}" ${moduleSortSaving || index === 0 ? "disabled" : ""}>上移</button>
+              aria-label="上移 ${escapeAttribute(title)}" ${sortSaving || index === 0 ? "disabled" : ""}>上移</button>
             <button type="button" class="btn btn-ghost" data-index="${index}" data-step="1"
-              aria-label="下移 ${escapeAttribute(title)}" ${moduleSortSaving || index === moduleSortDraft.length - 1 ? "disabled" : ""}>下移</button>
+              aria-label="下移 ${escapeAttribute(title)}" ${sortSaving || index === order.length - 1 ? "disabled" : ""}>下移</button>
           </div>
         </div>
       </li>`;
   }).join("");
-  moduleSortSave.disabled = moduleSortSaving || !moduleSortDraft.some((section, index) => section !== catalog.sections[index]);
-  moduleSortCancel.disabled = moduleSortSaving;
+  catalogSortSave.disabled = sortSaving || !order.some((originalIndex, index) => originalIndex !== index);
+  catalogSortCancel.disabled = sortSaving;
 }
 
-moduleSortButton.addEventListener("click", () => {
-  moduleSortDraft = [...catalog.sections];
-  moduleSortStatus.textContent = "";
-  moduleSortNotice.textContent = "";
-  renderModuleSort();
-  moduleSortDialog.showModal();
-});
+function openCatalogSort(sectionIndex) {
+  const section = sectionIndex === undefined ? null : catalog.sections[sectionIndex];
+  if (sectionIndex !== undefined && !section) return;
+  const entries = [...(section ? section.items : catalog.sections)];
+  if (entries.length < 2) return;
+  sortDraft = { section, entries, order: entries.map((_, index) => index) };
+  document.getElementById("catalogSortTitle").textContent = section ? `项目排序：${section.title || section.id}` : "模块排序";
+  document.getElementById("catalogSortHint").textContent = section
+    ? "保存后，首页这个模块里的卡片会按此顺序展示。"
+    : "保存后，首页左侧导航和模块列表会按此顺序展示。";
+  catalogSortStatus.textContent = "";
+  catalogSortNotice.textContent = "";
+  if (section) document.getElementById(`itemSortNotice-${sectionIndex}`).textContent = "";
+  renderCatalogSort();
+  catalogSortDialog.showModal();
+  catalogSortList.scrollTop = 0;
+}
 
-moduleSortList.addEventListener("click", (event) => {
+moduleSortButton.addEventListener("click", () => openCatalogSort());
+
+catalogSortList.addEventListener("click", (event) => {
   const button = event.target.closest("[data-step]");
-  if (!button || button.disabled || moduleSortSaving) return;
+  if (!button || button.disabled || sortSaving) return;
   const index = Number(button.dataset.index);
   const step = Number(button.dataset.step);
   const next = index + step;
-  if (next < 0 || next >= moduleSortDraft.length) return;
+  const { order } = sortDraft;
+  if (next < 0 || next >= order.length) return;
 
-  [moduleSortDraft[index], moduleSortDraft[next]] = [moduleSortDraft[next], moduleSortDraft[index]];
-  renderModuleSort();
-  const nextButton = moduleSortList.querySelector(`[data-index="${next}"][data-step="${step}"]:not(:disabled)`);
-  const otherButton = moduleSortList.querySelector(`[data-index="${next}"]:not(:disabled)`);
+  [order[index], order[next]] = [order[next], order[index]];
+  renderCatalogSort();
+  const nextButton = catalogSortList.querySelector(`[data-index="${next}"][data-step="${step}"]:not(:disabled)`);
+  const otherButton = catalogSortList.querySelector(`[data-index="${next}"]:not(:disabled)`);
   (nextButton || otherButton)?.focus();
 });
 
-moduleSortCancel.addEventListener("click", () => moduleSortDialog.close());
-moduleSortDialog.addEventListener("cancel", (event) => {
-  if (moduleSortSaving) event.preventDefault();
+catalogSortCancel.addEventListener("click", () => catalogSortDialog.close());
+catalogSortDialog.addEventListener("cancel", (event) => {
+  if (sortSaving) event.preventDefault();
 });
 
-moduleSortSave.addEventListener("click", async () => {
-  if (moduleSortSave.disabled) return;
-  moduleSortSaving = true;
-  moduleSortStatus.textContent = "正在保存顺序…";
-  renderModuleSort();
+catalogSortSave.addEventListener("click", async () => {
+  if (catalogSortSave.disabled) return;
+  sortSaving = true;
+  catalogSortStatus.textContent = "正在保存顺序…";
+  renderCatalogSort();
 
   try {
-    const response = await fetch("/api/catalog/order", {
+    const { section, entries, order } = sortDraft;
+    const body = section
+      ? { sectionId: section.id, expectedItems: entries, order }
+      : { sectionIds: order.map((index) => entries[index].id) };
+    const response = await fetch(section ? "/api/catalog/item-order" : "/api/catalog/order", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sectionIds: moduleSortDraft.map((section) => section.id) })
+      body: JSON.stringify(body)
     });
     if (response.status === 409) {
-      moduleSortStatus.textContent = "导航目录已更新。请刷新后台后重新排序。";
+      catalogSortStatus.textContent = section
+        ? "模块内容已更新。请刷新后台后重新排序。"
+        : "导航目录已更新。请刷新后台后重新排序。";
       return;
     }
     if (!response.ok) throw new Error("Save failed");
     catalog = await response.json();
     renderAdmin();
-    moduleSortDialog.close();
-    moduleSortNotice.textContent = "模块顺序已保存，刷新首页即可查看。";
+    catalogSortDialog.close();
+    if (section) {
+      const index = catalog.sections.findIndex((entry) => entry.id === section.id);
+      document.getElementById(`itemSortNotice-${index}`).textContent = "项目顺序已保存，刷新首页即可查看。";
+      document.querySelector(`[data-action="sort-items"][data-section-index="${index}"]`).focus({ preventScroll: true });
+    } else {
+      catalogSortNotice.textContent = "模块顺序已保存，刷新首页即可查看。";
+    }
   } catch {
-    moduleSortStatus.textContent = "保存顺序失败，请重试。";
+    catalogSortStatus.textContent = "保存顺序失败，请重试。";
   } finally {
-    moduleSortSaving = false;
-    if (moduleSortDialog.open) {
-      renderModuleSort();
-      moduleSortSave.focus();
+    sortSaving = false;
+    if (catalogSortDialog.open) {
+      renderCatalogSort();
+      catalogSortSave.focus();
     }
   }
 });
@@ -585,6 +614,9 @@ document.getElementById("sectionsList").addEventListener("click", (event) => {
   const itemIndex = Number(button.dataset.itemIndex);
 
   switch (button.dataset.action) {
+    case "sort-items":
+      openCatalogSort(sectionIndex);
+      break;
     case "edit-section":
       editSection(sectionIndex);
       break;
