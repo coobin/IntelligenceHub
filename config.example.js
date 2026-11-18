@@ -13,6 +13,7 @@ window.IntelligenceHubConfig = {
   // 公开分享 / 嵌入聊天 URL（勿放 API Key）
   assistantChatUrl: "",
 
-  // 侧边栏每日图片地址（可选）
+  // 如需显示侧边栏每日图片，将开关设为 true 并填写图片地址
+  dailyPhotoEnabled: false,
   dailyPhotoUrl: ""
 };

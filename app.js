@@ -127,12 +127,10 @@ function applyBranding() {
 
   const photoWrap = document.querySelector(".daily-photo-display");
   const photoImg = photoWrap && photoWrap.querySelector("img");
-  if (photoWrap) {
-    if (c.dailyPhotoUrl && photoImg) {
-      photoImg.src = c.dailyPhotoUrl;
-    } else {
-      photoWrap.style.display = "none";
-    }
+  const photoUrl = c.dailyPhotoEnabled === true ? safeUrl(c.dailyPhotoUrl) : "#";
+  if (photoImg && photoUrl !== "#") {
+    photoImg.src = photoUrl;
+    photoWrap.hidden = false;
   }
 }
 
@@ -177,7 +175,7 @@ async function trackEvent(type, target) {
 window.trackEvent = trackEvent;
 
 function initPhotoViewer() {
-  const photoDisplay = document.querySelector(".daily-photo-display img");
+  const photoDisplay = document.querySelector(".daily-photo-display:not([hidden]) img");
   const viewer = document.querySelector("#photoViewer");
   const viewerImg = document.querySelector("#photoViewerImg");
   const viewerClose = document.querySelector("#photoViewerClose");

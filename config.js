@@ -15,6 +15,7 @@ window.IntelligenceHubConfig = {
   // 助手嵌入聊天分享链接（公开 URL，切勿在此放 API Key）
   assistantChatUrl: "",
 
-  // 侧边栏每日图片地址（可选，留空则隐藏该模块）
+  // 侧边栏每日图片默认关闭
+  dailyPhotoEnabled: false,
   dailyPhotoUrl: ""
 };

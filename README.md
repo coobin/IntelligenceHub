@@ -53,7 +53,7 @@ Intelligence Hub 是一个面向企业内部的一站式导航与智能问答工
 
 | 配置项 | 位置 | 说明 |
 |---|---|---|
-| 站点 / 助手品牌、嵌入聊天链接、每日图片 | `config.local.js`（前端，gitignore） | 覆盖 `config.js` 中的占位默认值 |
+| 站点 / 助手品牌、嵌入聊天链接、每日图片 | `config.local.js`（前端，gitignore） | 每日图片默认关闭；设 `dailyPhotoEnabled: true` 并填写 `dailyPhotoUrl` 后才显示 |
 | `DIFY_API_URL` / `DIFY_API_KEY` | `.env`（后端，gitignore） | AI 助手代理目标与密钥 |
 | `ADMIN_REMOTE_USER` | `.env` | 允许访问 `/admin` 的 Authelia 账号 |
 | `INVOICE_HOST` / `INVOICE_PORT` | `.env` | 发票代理后端地址（可选） |

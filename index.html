@@ -13,11 +13,11 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./assets/icons/icon-192.png" type="image/png" />
     <link rel="apple-touch-icon" href="./assets/icons/apple-touch-icon.png" />
-    <link rel="stylesheet" href="./styles.css?v=20261012_01" />
+    <link rel="stylesheet" href="./styles.css?v=20261118_01" />
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://unpkg.com/marked@12.0.0/marked.min.js"></script>
     <script src="https://unpkg.com/dompurify@3.0.9/dist/purify.min.js"></script>
-    <script type="module" src="./app.js?v=20261012_01"></script>
+    <script type="module" src="./app.js?v=20261118_01"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -32,8 +32,8 @@
           </div>
         </div>
         <nav class="section-nav" id="sectionNav"></nav>
-        <div class="daily-photo-display">
-          <img src="" alt="今日照片" loading="lazy" />
+        <div class="daily-photo-display" hidden>
+          <img alt="今日照片" loading="lazy" />
         </div>
         <button class="sidebar-footer" id="adminEntry" type="button" aria-label="进入后台">
           <span class="status-dot"></span>
@@ -134,7 +134,7 @@
     <section class="photo-viewer" id="photoViewer" aria-hidden="true">
       <div class="photo-viewer-overlay" id="photoViewerOverlay"></div>
       <div class="photo-viewer-content">
-        <img src="" alt="今日照片全屏" id="photoViewerImg" />
+        <img alt="今日照片全屏" id="photoViewerImg" />
         <button class="photo-viewer-close" id="photoViewerClose" type="button" aria-label="关闭预览">×</button>
       </div>
     </section>
