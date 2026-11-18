@@ -136,6 +136,58 @@
       .btn-danger { background: #ef4444; color: white; }
       .btn-ghost { background: #f1f5f9; color: #475569; }
 
+      .editor-heading, .editor-actions, .module-sort-actions {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .editor-heading {
+        justify-content: space-between;
+        margin-bottom: 32px;
+      }
+
+      .module-sort-dialog {
+        width: min(520px, calc(100% - 32px));
+        max-height: calc(100% - 32px);
+        padding: clamp(16px, 4vw, 24px);
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        color: #1e293b;
+      }
+
+      .module-sort-dialog::backdrop { background: rgba(15, 23, 42, 0.52); }
+      .module-sort-dialog h2 { margin: 0 0 8px; font-size: 20px; }
+      .module-sort-hint { margin: 0; color: #475569; font-size: 14px; }
+
+      .module-sort-list {
+        max-height: min(44vh, 360px);
+        overflow-y: auto;
+        margin: 16px 0;
+        padding-inline: 30px 4px;
+      }
+
+      .module-sort-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        min-height: 48px;
+        border-bottom: 1px solid #e2e8f0;
+      }
+
+      .module-sort-row span { overflow-wrap: anywhere; }
+      .module-sort-moves { display: flex; flex: none; gap: 4px; }
+      .module-sort-moves .btn { padding: 8px; }
+      .module-sort-actions { justify-content: flex-end; }
+      .module-sort-status { margin: 0; font-size: 14px; color: #b91c1c; }
+      .module-sort-status:not(:empty) { margin-bottom: 12px; }
+      .module-sort-notice { margin: 0; color: #166534; }
+      .module-sort-notice:not(:empty) { margin-bottom: 16px; }
+      .module-sort-dialog .btn:disabled, #openModuleSort:disabled { opacity: 0.5; cursor: default; }
+      .module-sort-dialog .btn:focus-visible { outline: 2px solid #1d4ed8; outline-offset: 2px; }
+
       .modal {
         position: fixed;
         inset: 0;
@@ -511,10 +563,14 @@
 
         <!-- Editor View -->
         <div id="editorView" class="hidden">
-          <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px;">
+          <header class="editor-heading">
             <h1>导航目录编辑</h1>
-            <button class="btn btn-primary" onclick="addSection()">+ 添加分类</button>
+            <div class="editor-actions">
+              <button class="btn btn-ghost" id="openModuleSort" type="button" disabled>模块排序</button>
+              <button class="btn btn-primary" type="button" onclick="addSection()">+ 添加分类</button>
+            </div>
           </header>
+          <p class="module-sort-notice" id="moduleSortNotice" role="status"></p>
 
           <div id="sectionsList">
             <!-- 动态加载内容 -->
@@ -522,6 +578,17 @@
         </div>
       </main>
     </div>
+
+    <dialog class="module-sort-dialog" id="moduleSortDialog" aria-labelledby="moduleSortTitle" aria-describedby="moduleSortHint">
+      <h2 id="moduleSortTitle" tabindex="-1" autofocus>模块排序</h2>
+      <p class="module-sort-hint" id="moduleSortHint">保存后，首页左侧导航和模块列表会按此顺序展示。</p>
+      <ol class="module-sort-list" id="moduleSortList"></ol>
+      <p class="module-sort-status" id="moduleSortStatus" role="status"></p>
+      <div class="module-sort-actions">
+        <button class="btn btn-ghost" id="cancelModuleSort" type="button">取消</button>
+        <button class="btn btn-primary" id="saveModuleSort" type="button" disabled>保存顺序</button>
+      </div>
+    </dialog>
 
     <!-- 编辑 Item 模态框 -->
     <div id="itemModal" class="modal">
@@ -604,6 +671,6 @@
       </div>
     </div>
 
-    <script src="admin.js?v=20260826_01"></script>
+    <script src="admin.js?v=20261118_01"></script>
   </body>
 </html>

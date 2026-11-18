@@ -444,6 +444,7 @@ function parseUA(ua) {
 
 // 渲染管理界面
 function renderAdmin() {
+  document.getElementById("openModuleSort").disabled = catalog.sections.length < 2;
   const list = document.getElementById("sectionsList");
   list.innerHTML = catalog.sections.map((section, sIndex) => `
     <div class="section-editor">
@@ -485,6 +486,96 @@ function renderAdmin() {
     </div>
   `).join("");
 }
+
+const moduleSortButton = document.getElementById("openModuleSort");
+const moduleSortDialog = document.getElementById("moduleSortDialog");
+const moduleSortList = document.getElementById("moduleSortList");
+const moduleSortStatus = document.getElementById("moduleSortStatus");
+const moduleSortNotice = document.getElementById("moduleSortNotice");
+const moduleSortSave = document.getElementById("saveModuleSort");
+const moduleSortCancel = document.getElementById("cancelModuleSort");
+let moduleSortDraft = [];
+let moduleSortSaving = false;
+
+function renderModuleSort() {
+  moduleSortList.innerHTML = moduleSortDraft.map((section, index) => {
+    const title = section.title || section.id;
+    return `
+      <li>
+        <div class="module-sort-row">
+          <span>${escapeHtml(title)}</span>
+          <div class="module-sort-moves">
+            <button type="button" class="btn btn-ghost" data-index="${index}" data-step="-1"
+              aria-label="上移 ${escapeAttribute(title)}" ${moduleSortSaving || index === 0 ? "disabled" : ""}>上移</button>
+            <button type="button" class="btn btn-ghost" data-index="${index}" data-step="1"
+              aria-label="下移 ${escapeAttribute(title)}" ${moduleSortSaving || index === moduleSortDraft.length - 1 ? "disabled" : ""}>下移</button>
+          </div>
+        </div>
+      </li>`;
+  }).join("");
+  moduleSortSave.disabled = moduleSortSaving || !moduleSortDraft.some((section, index) => section !== catalog.sections[index]);
+  moduleSortCancel.disabled = moduleSortSaving;
+}
+
+moduleSortButton.addEventListener("click", () => {
+  moduleSortDraft = [...catalog.sections];
+  moduleSortStatus.textContent = "";
+  moduleSortNotice.textContent = "";
+  renderModuleSort();
+  moduleSortDialog.showModal();
+});
+
+moduleSortList.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-step]");
+  if (!button || button.disabled || moduleSortSaving) return;
+  const index = Number(button.dataset.index);
+  const step = Number(button.dataset.step);
+  const next = index + step;
+  if (next < 0 || next >= moduleSortDraft.length) return;
+
+  [moduleSortDraft[index], moduleSortDraft[next]] = [moduleSortDraft[next], moduleSortDraft[index]];
+  renderModuleSort();
+  const nextButton = moduleSortList.querySelector(`[data-index="${next}"][data-step="${step}"]:not(:disabled)`);
+  const otherButton = moduleSortList.querySelector(`[data-index="${next}"]:not(:disabled)`);
+  (nextButton || otherButton)?.focus();
+});
+
+moduleSortCancel.addEventListener("click", () => moduleSortDialog.close());
+moduleSortDialog.addEventListener("cancel", (event) => {
+  if (moduleSortSaving) event.preventDefault();
+});
+
+moduleSortSave.addEventListener("click", async () => {
+  if (moduleSortSave.disabled) return;
+  moduleSortSaving = true;
+  moduleSortStatus.textContent = "正在保存顺序…";
+  renderModuleSort();
+
+  try {
+    const response = await fetch("/api/catalog/order", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sectionIds: moduleSortDraft.map((section) => section.id) })
+    });
+    if (response.status === 409) {
+      moduleSortStatus.textContent = "导航目录已更新。请刷新后台后重新排序。";
+      return;
+    }
+    if (!response.ok) throw new Error("Save failed");
+    catalog = await response.json();
+    renderAdmin();
+    moduleSortDialog.close();
+    moduleSortNotice.textContent = "模块顺序已保存，刷新首页即可查看。";
+  } catch {
+    moduleSortStatus.textContent = "保存顺序失败，请重试。";
+  } finally {
+    moduleSortSaving = false;
+    if (moduleSortDialog.open) {
+      renderModuleSort();
+      moduleSortSave.focus();
+    }
+  }
+});
 
 document.getElementById("sectionsList").addEventListener("click", (event) => {
   const button = event.target.closest("[data-action]");

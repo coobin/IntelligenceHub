@@ -624,6 +624,29 @@ app.post("/api/catalog", authenticate, (req, res) => {
   }
 });
 
+// 模块排序只更新分类顺序，保留目录中已有的内容。
+app.put("/api/catalog/order", authenticate, (req, res) => {
+  const { sectionIds } = req.body || {};
+  if (!Array.isArray(sectionIds) || !sectionIds.every((id) => typeof id === "string")
+    || new Set(sectionIds).size !== sectionIds.length) {
+    return res.status(400).json({ success: false, message: "模块顺序格式不正确" });
+  }
+
+  try {
+    const catalog = JSON.parse(fs.readFileSync(CATALOG_FILE, "utf8"));
+    const sectionsById = new Map(catalog.sections.map((section) => [section.id, section]));
+    if (sectionIds.length !== catalog.sections.length || sectionsById.size !== catalog.sections.length
+      || sectionIds.some((id) => !sectionsById.has(id))) {
+      return res.status(409).json({ success: false, message: "导航目录已更新，请刷新后重新排序" });
+    }
+    catalog.sections = sectionIds.map((id) => sectionsById.get(id));
+    writeJsonFile(CATALOG_FILE, catalog);
+    res.json(catalog);
+  } catch {
+    res.status(500).json({ success: false, message: "无法保存模块顺序" });
+  }
+});
+
 // 检查登录状态
 app.get("/api/check-auth", (req, res) => {
   const remoteUser = req.headers["remote-user"] || "";
