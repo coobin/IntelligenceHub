@@ -319,7 +319,8 @@ async function fetchExpenseSummary(username, currentPeriod) {
     if (data?.status !== "ok" || data?.ui?.schema !== "chency.expense.v1") {
       return { status: "unavailable", currentPeriod };
     }
-    const records = Array.isArray(data.ui.records) ? data.ui.records : [];
+    const records = data.ui.records;
+    if (!Array.isArray(records)) return { status: "unavailable", currentPeriod };
     const pickRecord = (record) => (record ? {
       period: truncateText(record.period || "", 32),
       invoiceAmount: Number(record.invoiceAmount || 0),
@@ -329,9 +330,28 @@ async function fetchExpenseSummary(username, currentPeriod) {
     const currentPeriodRecord = records.find((record) => String(record?.period || "").includes(currentPeriod)) || null;
     const latestRecord = records[0] || null;
     const summary = data.ui.summary || {};
+    const previousMonths = [1, 2, 3].map((offset) => {
+      const firstDay = new Date(Date.UTC(Number(currentPeriod.slice(0, 4)), Number(currentPeriod.slice(4)) - 1 - offset, 1));
+      const period = firstDay.toISOString().slice(0, 7).replace("-", "");
+      let invoiceCount = 0;
+      let reimbursedCents = 0;
+      let hasSharedPeriod = false;
+      for (const record of records) {
+        const periods = String(record.period || "").split(",").map((part) => part.trim());
+        if (!periods.includes(period)) continue;
+        if (periods.length > 1) {
+          hasSharedPeriod = true;
+          continue;
+        }
+        invoiceCount += Number(record.invoiceCount);
+        reimbursedCents += Math.round(Number(record.reimbursedAmount) * 100);
+      }
+      return { period, invoiceCount, reimbursedAmount: reimbursedCents / 100, hasSharedPeriod };
+    });
     return {
       status: "ok",
       currentPeriod,
+      previousMonths,
       currentPeriodSubmitted: Boolean(currentPeriodRecord),
       currentPeriodRecord: pickRecord(currentPeriodRecord),
       latestRecord: pickRecord(latestRecord),

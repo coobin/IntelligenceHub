@@ -83,6 +83,11 @@ test("home-summary aggregates meetings, current-period expense, popular entries 
   const byType = Object.fromEntries(nowParts.map((part) => [part.type, part.value]));
   const currentPeriod = `${byType.year}${byType.month}`;
   const todayIso = `${byType.year}-${byType.month}-${byType.day}`;
+  const cursor = new Date(`${byType.year}-${byType.month}-01T00:00:00Z`);
+  const previousPeriods = Array.from({ length: 3 }, () => {
+    cursor.setUTCMonth(cursor.getUTCMonth() - 1);
+    return cursor.toISOString().slice(0, 7).replace("-", "");
+  });
 
   const server = await startTestServer((req, res) => {
     res.setHeader("Content-Type", "application/json");
@@ -109,9 +114,11 @@ test("home-summary aggregates meetings, current-period expense, popular entries 
           type: "history_results",
           records: [
             { period: currentPeriod, invoiceAmount: 128, reimbursedAmount: 100, invoiceCount: 1 },
-            { period: "202601", invoiceAmount: 90, reimbursedAmount: 90, invoiceCount: 1 }
+            { period: previousPeriods[0], invoiceAmount: 50, reimbursedAmount: 39.9, invoiceCount: 2 },
+            { period: previousPeriods[0], invoiceAmount: 30, reimbursedAmount: 21.3, invoiceCount: 1 },
+            { period: `${previousPeriods[2]}, ${currentPeriod}`, invoiceAmount: 48, reimbursedAmount: 40, invoiceCount: 1 }
           ],
-          summary: { count: 2, invoiceAmount: 218, reimbursedAmount: 190 }
+          summary: { count: 4, invoiceAmount: 256, reimbursedAmount: 201.2 }
         }
       }));
     }
@@ -145,7 +152,12 @@ test("home-summary aggregates meetings, current-period expense, popular entries 
     assert.equal(cloudData.expense.status, "ok");
     assert.equal(cloudData.expense.currentPeriodSubmitted, true);
     assert.equal(cloudData.expense.currentPeriodRecord?.reimbursedAmount, 100);
-    assert.equal(cloudData.expense.yearSummary.count, 2);
+    assert.equal(cloudData.expense.yearSummary.count, 4);
+    assert.deepEqual(cloudData.expense.previousMonths, [
+      { period: previousPeriods[0], invoiceCount: 3, reimbursedAmount: 61.2, hasSharedPeriod: false },
+      { period: previousPeriods[1], invoiceCount: 0, reimbursedAmount: 0, hasSharedPeriod: false },
+      { period: previousPeriods[2], invoiceCount: 0, reimbursedAmount: 0, hasSharedPeriod: true }
+    ]);
 
     const meetCall = server.calls.find((call) => call.url === "/api/ai/meetings-query");
     assert.equal(meetCall.headers["x-chency-user"], "zhangsan");

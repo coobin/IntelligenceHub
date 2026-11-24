@@ -658,6 +658,22 @@ p {
   text-overflow: ellipsis;
 }
 
+.expense-period-row {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  font-size: 13px;
+  line-height: 1.55;
+  font-variant-numeric: tabular-nums;
+}
+
+.expense-period-row span {
+  color: var(--muted);
+}
+
 .bento-sub-line {
   margin: 0;
   font-size: 12.5px;

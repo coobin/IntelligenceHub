@@ -13,11 +13,11 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./assets/icons/icon-192.png" type="image/png" />
     <link rel="apple-touch-icon" href="./assets/icons/apple-touch-icon.png" />
-    <link rel="stylesheet" href="./styles.css?v=20261124_03" />
+    <link rel="stylesheet" href="./styles.css?v=20261124_04" />
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://unpkg.com/marked@12.0.0/marked.min.js"></script>
     <script src="https://unpkg.com/dompurify@3.0.9/dist/purify.min.js"></script>
-    <script type="module" src="./app.js?v=20261124_03"></script>
+    <script type="module" src="./app.js?v=20261124_04"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -86,6 +86,16 @@
           </section>
 
           <section class="home-bento" id="homeBentoGrid" aria-label="今日工作台概览">
+            <article class="bento-card bento-card-quick" id="bentoQuickCard">
+              <div class="bento-card-head">
+                <span class="bento-card-title"><i data-lucide="pin"></i>我的常用</span>
+                <span class="bento-badge" id="bentoQuickBadge">自动推荐</span>
+              </div>
+              <div class="bento-quick-grid" id="bentoQuickBody">
+                <p class="bento-placeholder">加载常用入口…</p>
+              </div>
+            </article>
+
             <article class="bento-card bento-card-meeting" id="bentoMeetingCard">
               <div class="bento-card-head">
                 <span class="bento-card-title"><i data-lucide="calendar-clock"></i>今日日程</span>
@@ -106,7 +116,7 @@
                 <span class="bento-badge" id="bentoExpenseBadge">加载中</span>
               </div>
               <div class="bento-card-body" id="bentoExpenseBody">
-                <p class="bento-placeholder">正在查询当月报销状态…</p>
+                <p class="bento-placeholder">正在查询前三个月的报销记录…</p>
               </div>
               <div class="bento-card-actions">
                 <button class="bento-action-btn" type="button" data-quick-prompt="查询我的通讯费报销记录">历史记录</button>
@@ -114,15 +124,6 @@
               </div>
             </article>
 
-            <article class="bento-card bento-card-quick" id="bentoQuickCard">
-              <div class="bento-card-head">
-                <span class="bento-card-title"><i data-lucide="pin"></i>我的常用</span>
-                <span class="bento-badge" id="bentoQuickBadge">自动推荐</span>
-              </div>
-              <div class="bento-quick-grid" id="bentoQuickBody">
-                <p class="bento-placeholder">加载常用入口…</p>
-              </div>
-            </article>
           </section>
 
           <div class="catalog-toolbar" id="catalogToolbar">

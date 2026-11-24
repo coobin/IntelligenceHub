@@ -345,40 +345,21 @@ function renderHomeBento() {
   if (bentoExpenseBody && config.homeExpenseCardEnabled !== false) {
     if (!summary) {
       setBadgeState(bentoExpenseBadge, "加载中", "is-muted");
-      bentoExpenseBody.innerHTML = `<p class="bento-placeholder">正在查询当月报销状态…</p>`;
-    } else if (expenseData?.status === "ok") {
-      const periodLabel = formatBillingPeriodLabel(expenseData.currentPeriod) || "本月";
-      if (expenseData.currentPeriodSubmitted && expenseData.currentPeriodRecord) {
-        const currentRec = expenseData.currentPeriodRecord;
-        setBadgeState(bentoExpenseBadge, "本月已提", "is-ok");
-        bentoExpenseBody.innerHTML = `
-          <p class="bento-primary-line">${escapeHtml(periodLabel)} · 实报 ¥${escapeHtml(formatCurrencyValue(currentRec.reimbursedAmount))}</p>
-          <p class="bento-sub-line">
-            <span class="bento-sub-tag">发票 ¥${escapeHtml(formatCurrencyValue(currentRec.invoiceAmount))}</span>
-            <span>已入报销池（${currentRec.invoiceCount || 1} 张）</span>
-          </p>
-        `;
-      } else if (expenseData.latestRecord) {
-        const latestRec = expenseData.latestRecord;
-        const latestPeriod = formatBillingPeriodLabel(latestRec.period);
-        setBadgeState(bentoExpenseBadge, "本月待提", "is-warn");
-        bentoExpenseBody.innerHTML = `
-          <p class="bento-primary-line">${escapeHtml(periodLabel)}暂未提交通讯费</p>
-          <p class="bento-sub-line">最近已报：${escapeHtml(latestPeriod)} · 实报 ¥${escapeHtml(formatCurrencyValue(latestRec.reimbursedAmount))}</p>
-        `;
-      } else {
-        setBadgeState(bentoExpenseBadge, "暂无记录", "is-muted");
-        bentoExpenseBody.innerHTML = `
-          <p class="bento-primary-line">近一年暂无通讯费报销记录</p>
-          <p class="bento-sub-line">支持 PDF 或图片一键校验并入报销池</p>
-        `;
-      }
+      bentoExpenseBody.innerHTML = `<p class="bento-placeholder">正在查询前三个月的报销记录…</p>`;
+    } else if (expenseData?.status === "ok" && Array.isArray(expenseData.previousMonths)) {
+      setBadgeState(bentoExpenseBadge, "前三个账期");
+      bentoExpenseBody.innerHTML = expenseData.previousMonths.map((month) => {
+        let detail = "暂无已确认记录";
+        if (month.hasSharedPeriod) {
+          detail = "含跨月报销，详见历史记录";
+        } else if (month.invoiceCount > 0) {
+          detail = `${month.invoiceCount} 张 · 实报 ¥${formatCurrencyValue(month.reimbursedAmount)}`;
+        }
+        return `<p class="expense-period-row"><strong>${escapeHtml(formatBillingPeriodLabel(month.period))}</strong><span>${escapeHtml(detail)}</span></p>`;
+      }).join("");
     } else {
-      setBadgeState(bentoExpenseBadge, "一键校验", "is-muted");
-      bentoExpenseBody.innerHTML = `
-        <p class="bento-primary-line">通讯费发票自动识别校验</p>
-        <p class="bento-sub-line">支持批量上传 PDF/图片并确认入池</p>
-      `;
+      setBadgeState(bentoExpenseBadge, "前三个账期", "is-muted");
+      bentoExpenseBody.innerHTML = `<p class="bento-placeholder">暂时无法获取报销记录。</p>`;
     }
   }
 
