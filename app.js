@@ -1,10 +1,3 @@
-const typeLabels = {
-  h5: "H5",
-  client: "客户端",
-  tool: "工具",
-  website: "网址"
-};
-
 const iconMapping = {
   "邮件": "mail",
   "邮箱": "mail",
@@ -282,8 +275,6 @@ function renderCatalog() {
 
 
 function renderCard(item) {
-  const typeClass = `type-${item.type}`;
-  const label = typeLabels[item.type] || item.type;
   const isExternal = ["h5", "website", "tool"].includes(item.type);
   const target = isExternal ? 'target="_blank" rel="noopener noreferrer"' : "";
   const iconName = getIcon(item.name, item.icon);
@@ -310,7 +301,6 @@ function renderCard(item) {
       <div class="card-content">
         <div class="card-top">
           <h3>${itemName}</h3>
-          <span class="type-pill ${escapeAttribute(typeClass)}">${escapeHtml(label)}</span>
         </div>
         ${detailHtml}
       </div>

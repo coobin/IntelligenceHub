@@ -360,7 +360,6 @@ function renderAllEntryClicks(clicks) {
         <tr>
           <th>入口名称</th>
           <th>所属分类</th>
-          <th>类型</th>
           <th style="text-align:right;">点击次数</th>
         </tr>
       </thead>
@@ -369,10 +368,9 @@ function renderAllEntryClicks(clicks) {
           <tr>
             <td class="entry-click-name">${escapeHtml(entry.name)}</td>
             <td>${escapeHtml(entry.section)}</td>
-            <td><span class="type-pill type-${escapeAttribute(entry.type)}" style="font-size:11px;">${escapeHtml(entry.type)}</span></td>
             <td class="entry-click-count">${toNumber(entry.clicks)}</td>
           </tr>
-        `).join("") || '<tr><td colspan="4" style="text-align:center; padding:20px; color:#94a3b8;">暂无入口数据</td></tr>'}
+        `).join("") || '<tr><td colspan="3" style="text-align:center; padding:20px; color:#94a3b8;">暂无入口数据</td></tr>'}
       </tbody>
     </table>
   `;
