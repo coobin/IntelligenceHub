@@ -114,7 +114,8 @@
 
       .item-row {
         display: grid;
-        grid-template-columns: 2fr 3fr 2fr 1fr auto;
+        grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) minmax(0, 1fr) 96px;
+        overflow-wrap: anywhere;
         gap: 16px;
         align-items: center;
         padding: 12px 0;
@@ -123,6 +124,29 @@
 
       .item-row:last-child {
         border-bottom: 0;
+      }
+
+      .item-name {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 600;
+      }
+
+      .item-icon {
+        display: grid;
+        place-items: center;
+        flex: 0 0 32px;
+        height: 32px;
+        border-radius: 8px;
+        color: #2563eb;
+        background: #eff6ff;
+      }
+
+      .item-icon svg, .item-icon img {
+        width: 18px;
+        height: 18px;
+        object-fit: contain;
       }
 
       .btn {
@@ -673,6 +697,7 @@
       </div>
     </div>
 
-    <script src="admin.js?v=20261118_02"></script>
+    <script defer src="https://unpkg.com/lucide@1.79.0/dist/umd/lucide.min.js" integrity="sha384-BqRrWtT4teonPDtZKRNshL/rppOoqxeAHLfUcL1tSbU0Slok4OE/xVxwdLb9R2ls" crossorigin="anonymous"></script>
+    <script defer src="admin.js?v=20261124_01"></script>
   </body>
 </html>

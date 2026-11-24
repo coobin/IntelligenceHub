@@ -442,6 +442,20 @@ function parseUA(ua) {
   return "其他设备";
 }
 
+function renderItemIcon(item) {
+  const icon = String(item.icon || "").trim();
+  if (/[/.]/.test(icon)) {
+    try {
+      const url = new URL(icon, document.baseURI);
+      if (["http:", "https:"].includes(url.protocol)) {
+        return `<img src="${escapeAttribute(url.href)}" alt="">`;
+      }
+    } catch {}
+  }
+  const name = /^[a-z0-9-]+$/.test(icon) ? icon : "layout-grid";
+  return `<i data-lucide="${escapeAttribute(name)}"></i>`;
+}
+
 // 渲染管理界面
 function renderAdmin() {
   document.getElementById("openModuleSort").disabled = catalog.sections.length < 2;
@@ -465,18 +479,16 @@ function renderAdmin() {
         <div class="item-row" style="font-weight:600; color:#94a3b8; font-size:12px; border-bottom:1px solid #e2e8f0; padding-bottom:8px;">
           <div>名称</div>
           <div>描述 / URL</div>
-          <div>类型</div>
           <div>状态</div>
           <div>操作</div>
         </div>
         ${section.items.map((item, iIndex) => `
           <div class="item-row">
-            <div style="font-weight:600">${escapeHtml(item.name)}</div>
+            <div class="item-name"><span class="item-icon" aria-hidden="true">${renderItemIcon(item)}</span><span>${escapeHtml(item.name)}</span></div>
             <div style="font-size:13px; color:#64748b;">
               <div>${escapeHtml(item.description || "-")}</div>
               <div style="color:#94a3b8; font-family:monospace; font-size:11px;">${escapeHtml(item.url)}</div>
             </div>
-            <div><span class="type-pill type-${escapeAttribute(item.type)}" style="font-size:11px;">${escapeHtml(item.type)}</span></div>
             <div style="font-size:12px;">${escapeHtml(item.status || "-")}</div>
             <div style="display:flex; gap:4px;">
               <button class="btn btn-ghost" style="padding:4px 8px;" data-action="edit-item" data-section-id="${escapeAttribute(section.id)}" data-item-index="${iIndex}">编辑</button>
@@ -487,6 +499,7 @@ function renderAdmin() {
       </div>
     </div>
   `).join("");
+  window.lucide?.createIcons({ root: list });
 }
 
 const moduleSortButton = document.getElementById("openModuleSort");

@@ -21,7 +21,7 @@
           "type": "h5",
           "tags": ["文件", "协作"],
           "status": "内部系统",
-          "icon": "hard-drive"
+          "icon": "folder-sync"
         },
         {
           "name": "ERP 系统",
@@ -30,7 +30,7 @@
           "type": "h5",
           "tags": ["财务", "ERP"],
           "status": "内部系统",
-          "icon": "chart-no-axes-combined"
+          "icon": "chart-column-increasing"
         },
         {
           "name": "HR 系统",
@@ -39,7 +39,7 @@
           "type": "h5",
           "tags": ["HR", "薪酬"],
           "status": "内部系统",
-          "icon": "users"
+          "icon": "book-user"
         }
       ]
     },
@@ -55,7 +55,7 @@
           "type": "client",
           "tags": ["IM", "客户端"],
           "status": "需本机安装",
-          "icon": "message-circle"
+          "icon": "message-circle-more"
         },
         {
           "name": "ERP 客户端(仅支持 Windows)",
@@ -64,7 +64,7 @@
           "type": "client",
           "tags": ["客户端"],
           "status": "Windows 客户端",
-          "icon": "monitor-up",
+          "icon": "app-window",
           "actions": [
             {
               "label": "下载启动支持",
@@ -90,7 +90,7 @@
           "type": "tool",
           "tags": ["PDF", "转换"],
           "status": "内部工具",
-          "icon": "file-type-2"
+          "icon": "file-output"
         },
         {
           "name": "流程图制作",
@@ -115,7 +115,7 @@
           "type": "website",
           "tags": ["AI", "助手"],
           "status": "外部站点",
-          "icon": "bot"
+          "icon": "bot-message-square"
         },
         {
           "name": "DeepSeek",
