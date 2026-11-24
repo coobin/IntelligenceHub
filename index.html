@@ -13,59 +13,44 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./assets/icons/icon-192.png" type="image/png" />
     <link rel="apple-touch-icon" href="./assets/icons/apple-touch-icon.png" />
-    <link rel="stylesheet" href="./styles.css?v=20261124_04" />
+    <link rel="stylesheet" href="./styles.css?v=20261124_05" />
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://unpkg.com/marked@12.0.0/marked.min.js"></script>
     <script src="https://unpkg.com/dompurify@3.0.9/dist/purify.min.js"></script>
-    <script type="module" src="./app.js?v=20261124_04"></script>
+    <script type="module" src="./app.js?v=20261124_05"></script>
   </head>
   <body>
     <div class="app-shell">
-      <aside class="sidebar" aria-label="主导航">
+      <header class="site-bar"><div class="site-bar-inner">
         <div class="brand-block">
           <span class="brand-mark" aria-hidden="true">
             <img src="./assets/icons/icon-192.png" alt="" />
           </span>
           <div>
-            <div class="brand-name">Intelligence Hub</div>
-            <div class="brand-subtitle">Intelligence Hub</div>
+            <h1 class="brand-name">Intelligence Hub</h1>
+            <div class="brand-subtitle"></div>
           </div>
         </div>
-        <nav class="section-nav" id="sectionNav"></nav>
-        <div class="daily-photo-display" hidden>
-          <img alt="今日照片" loading="lazy" />
+        <div class="account-tools">
+          <span class="workspace-date" id="workspaceDate"></span>
+          <button type="button" class="daily-photo-display" hidden aria-label="查看今日照片"><img alt="今日照片" loading="lazy" /></button>
+          <button class="topbar-icon-btn" id="summaryRefreshBtn" type="button" aria-label="刷新工作台状态" title="刷新今日日程与报销状态"><i data-lucide="refresh-cw"></i></button>
+          <div class="account-profile">
+            <button id="accountToggle" class="account-toggle" type="button" aria-controls="accountMenu" disabled>
+              <span class="account-avatar" id="accountAvatar" aria-hidden="true"><i data-lucide="user-round"></i></span>
+              <span id="accountName">访客</span>
+            </button>
+            <div id="accountMenu" class="account-menu" hidden><a href="/admin">后台管理</a></div>
+          </div>
         </div>
-        <button class="sidebar-footer" id="adminEntry" type="button" aria-label="进入后台">
-          <span class="status-dot"></span>
-          <span>内部工作台</span>
-        </button>
-      </aside>
+      </div></header>
 
       <main class="workspace">
         <div class="workspace-inner">
-          <header class="workspace-topbar">
-            <div class="workspace-greeting-group">
-              <h1 class="workspace-greeting" id="workspaceGreeting">欢迎回来</h1>
-              <span class="workspace-date" id="workspaceDate"></span>
-            </div>
-            <div class="workspace-topbar-actions">
-              <button class="topbar-kbd-btn" id="commandFocusBtn" type="button" title="搜索系统入口或向助手提问">
-                <i data-lucide="search"></i>
-                <span>搜入口 / 问助手</span>
-                <kbd id="commandShortcutHint">⌘K</kbd>
-              </button>
-              <button class="topbar-icon-btn" id="summaryRefreshBtn" type="button" aria-label="刷新工作台状态" title="刷新今日日程与报销状态">
-                <i data-lucide="refresh-cw"></i>
-              </button>
-            </div>
-          </header>
-
           <section class="assistant-home" id="assistantHome" aria-label="智能搜索与对话区">
-            <div class="assistant-home-heading">
-              <h2>今天想让助手帮你做什么？</h2>
-            </div>
             <div class="assistant-inline-mount" id="assistantInlineMount"></div>
             <div class="command-match-panel" id="commandMatchPanel" hidden aria-live="polite"></div>
+            <div class="assistant-tools">
             <div class="assistant-quick-prompts" id="assistantQuickPrompts" aria-label="常用快捷指令">
               <button class="quick-prompt-chip" type="button" data-quick-prompt="查一下我今天的会议">
                 <i data-lucide="calendar"></i><span>查今日会议</span>
@@ -82,6 +67,12 @@
               <button class="quick-prompt-chip" type="button" data-quick-prefill="公司制度里关于">
                 <i data-lucide="book-open"></i><span>问公司制度</span>
               </button>
+            </div>
+              <div class="assistant-widget">
+                <button class="quick-prompt-chip" id="assistantToggle" type="button" aria-expanded="false" aria-controls="assistantPanel" aria-label="在浮窗中打开助手">
+                  <i data-lucide="panels-top-left"></i><span>助手浮窗</span>
+                </button>
+              </div>
             </div>
           </section>
 
@@ -127,7 +118,7 @@
           </section>
 
           <div class="catalog-toolbar" id="catalogToolbar">
-            <div class="catalog-tabs" id="catalogTabs" role="tablist" aria-label="入口分类筛选"></div>
+            <h2>应用目录</h2>
             <div class="catalog-toolbar-right">
               <div class="density-switch" role="group" aria-label="卡片显示密度">
                 <button class="density-btn active" type="button" data-density="compact" title="紧凑磁贴视图">
@@ -139,16 +130,13 @@
               </div>
             </div>
           </div>
+          <div class="catalog-tabs" id="catalogTabs" role="group" aria-label="入口分类筛选"></div>
 
           <section class="catalog-area" id="catalogArea" aria-live="polite"></section>
         </div>
       </main>
     </div>
 
-    <section class="assistant-widget" aria-label="智能问答">
-      <button class="assistant-fab" id="assistantToggle" type="button" aria-expanded="false" aria-controls="assistantPanel" aria-label="打开 AI 助手">
-        <span class="assistant-fab-mark" aria-hidden="true">AI 助手</span>
-      </button>
       <aside class="assistant-panel" id="assistantPanel" aria-hidden="true">
         <input type="file" id="nativeInvoiceUpload" accept="image/*,application/pdf" multiple style="display:none" />
 
@@ -200,10 +188,12 @@
             <div class="assistant-attachment-pool" id="assistantAttachmentPool" style="display:none;"></div>
             
             <div class="assistant-input-wrapper">
+              <span class="command-search-icon" aria-hidden="true"><i data-lucide="search"></i></span>
               <button class="native-upload-btn" id="nativeUploadBtn" type="button" aria-label="通讯费报销">
                 通讯费报销
               </button>
-              <textarea id="assistantInput" placeholder="搜内部系统入口，或问助手（会议、通讯费报销、公司制度）…" rows="1"></textarea>
+              <textarea id="assistantInput" aria-label="搜入口或问助手" placeholder="搜系统入口，或问助手…" rows="1"></textarea>
+              <kbd id="commandShortcutHint" aria-hidden="true">⌘K</kbd>
               <input id="difyAttachmentInput" type="file" accept="image/*,application/pdf" multiple style="display:none;" />
               <button id="difyAttachmentBtn" class="assistant-mic-btn" type="button" aria-label="上传发票附件">
                 <i data-lucide="paperclip"></i>
@@ -222,7 +212,6 @@
           </div>
         </div>
       </aside>
-    </section>
     <section class="photo-viewer" id="photoViewer" aria-hidden="true">
       <div class="photo-viewer-overlay" id="photoViewerOverlay"></div>
       <div class="photo-viewer-content">

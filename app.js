@@ -49,7 +49,6 @@ const state = {
   activeCommandIndex: -1
 };
 
-const sectionNav = document.querySelector("#sectionNav");
 const catalogArea = document.querySelector("#catalogArea");
 const catalogTabs = document.querySelector("#catalogTabs");
 const assistantToggle = document.querySelector("#assistantToggle");
@@ -59,9 +58,9 @@ const assistantResizeHandle = document.querySelector("#assistantResizeHandle");
 const assistantHome = document.querySelector("#assistantHome");
 const assistantInlineMount = document.querySelector("#assistantInlineMount");
 const commandMatchPanel = document.querySelector("#commandMatchPanel");
-const workspaceGreeting = document.querySelector("#workspaceGreeting");
+const accountToggle = document.querySelector("#accountToggle");
+const accountMenu = document.querySelector("#accountMenu");
 const workspaceDate = document.querySelector("#workspaceDate");
-const commandFocusBtn = document.querySelector("#commandFocusBtn");
 const commandShortcutHint = document.querySelector("#commandShortcutHint");
 const summaryRefreshBtn = document.querySelector("#summaryRefreshBtn");
 const homeBentoGrid = document.querySelector("#homeBentoGrid");
@@ -73,7 +72,6 @@ const bentoExpenseBadge = document.querySelector("#bentoExpenseBadge");
 const bentoExpenseBody = document.querySelector("#bentoExpenseBody");
 const bentoQuickBadge = document.querySelector("#bentoQuickBadge");
 const bentoQuickBody = document.querySelector("#bentoQuickBody");
-const adminEntry = document.querySelector("#adminEntry");
 const ASSISTANT_SIZE_STORAGE_KEY = "intelligence-hub.assistant-size.v1";
 const PINNED_ENTRIES_STORAGE_PREFIX = "intelligence-hub.pinned.v1";
 const LOCAL_CLICKS_STORAGE_PREFIX = "intelligence-hub.local-clicks.v1";
@@ -178,7 +176,6 @@ function togglePinEntry(entryName) {
     if (state.pinnedNames.length > 24) state.pinnedNames = state.pinnedNames.slice(0, 24);
   }
   savePinnedNames();
-  renderNavigation();
   renderCatalogToolbar();
   renderBentoQuickCard();
   renderCatalog();
@@ -193,19 +190,9 @@ function recordLocalClick(entryName) {
 
 function renderWorkspaceHeader() {
   const now = new Date();
-  const hour = now.getHours();
-  const timeGreeting = hour >= 5 && hour < 12
-    ? "上午好"
-    : hour >= 12 && hour < 14
-    ? "中午好"
-    : hour >= 14 && hour < 18
-    ? "下午好"
-    : hour >= 18 && hour < 23
-    ? "晚上好"
-    : "夜深了";
-  if (workspaceGreeting) {
-    workspaceGreeting.textContent = state.displayName ? `${timeGreeting}，${state.displayName}` : timeGreeting;
-  }
+  const name = state.displayName || state.user;
+  document.querySelector("#accountName").textContent = name || "访客";
+  if (name) document.querySelector("#accountAvatar").textContent = Array.from(name)[0].toUpperCase();
   if (workspaceDate) {
     const weekdays = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
     workspaceDate.textContent = `${now.getMonth() + 1}月${now.getDate()}日 ${weekdays[now.getDay()]}`;
@@ -566,15 +553,13 @@ function applyBranding() {
   const setText = (sel, val) => { const el = document.querySelector(sel); if (el && val) el.textContent = val; };
   if (c.siteTitle) document.title = c.siteTitle;
   setText(".brand-name", c.brandName);
-  setText(".brand-subtitle", c.brandSubtitle);
-  setText(".assistant-fab-mark", c.assistantName);
+  if (c.brandSubtitle !== c.brandName) setText(".brand-subtitle", c.brandSubtitle);
   if (c.assistantName) {
     const homeAssistantName = c.assistantName.replace(/助手$/, "");
-    setText(".assistant-home-heading h2", `今天想让${homeAssistantName}帮你做什么？`);
     setText(".assistant-message-system .assistant-message-content", `你好！我是${c.assistantName}，有什么我可以帮您的吗？`);
     const inputEl = document.querySelector("#assistantInput");
     if (inputEl) {
-      inputEl.setAttribute("placeholder", `搜内部系统入口，或问${homeAssistantName}（会议、通讯费报销、公司制度）…`);
+      inputEl.setAttribute("placeholder", `搜系统入口，或问${homeAssistantName}…`);
     }
   }
   if (c.poweredBy) setText(".assistant-footer", `POWERED BY ${c.poweredBy}`);
@@ -602,12 +587,16 @@ async function bootstrap() {
     if (authRes.ok) {
       const authData = await authRes.json();
       state.user = authData.user || "";
+      if (authData.authenticated === true) {
+        accountToggle.disabled = false;
+        accountToggle.setAttribute("aria-expanded", "false");
+      }
+      renderWorkspaceHeader();
     }
   } catch(e) {}
 
   loadUserWorkbenchPrefs();
   syncDensityButtons();
-  renderNavigation();
   renderCatalogToolbar();
   renderHomeBento();
   renderCatalog();
@@ -635,7 +624,7 @@ async function trackEvent(type, target) {
 window.trackEvent = trackEvent;
 
 function initPhotoViewer() {
-  const photoDisplay = document.querySelector(".daily-photo-display:not([hidden]) img");
+  const photoDisplay = document.querySelector(".daily-photo-display:not([hidden])");
   const viewer = document.querySelector("#photoViewer");
   const viewerImg = document.querySelector("#photoViewerImg");
   const viewerClose = document.querySelector("#photoViewerClose");
@@ -645,7 +634,7 @@ function initPhotoViewer() {
 
   const openViewer = () => {
     // 使用预览图地址
-    viewerImg.src = photoDisplay.src;
+    viewerImg.src = photoDisplay.querySelector("img").src;
     viewer.setAttribute("aria-hidden", "false");
     document.body.style.overflow = "hidden"; // 禁止滚动
   };
@@ -685,48 +674,8 @@ async function loadConfigs() {
   await load("./config.local.js");
 }
 
-function renderNavigation() {
-  const total = state.catalog.reduce((sum, section) => sum + section.items.length, 0);
-  const pinnedCount = getValidPinnedEntries().length;
-  const topNavItems = [
-    { id: "all", title: "全部入口", icon: "layout-grid", count: total },
-    { id: "pinned", title: "我的固定", icon: "pin", count: pinnedCount }
-  ];
-  const sectionItems = state.catalog.map((section) => ({
-    id: section.id,
-    title: section.title,
-    icon: "folder",
-    count: section.items.length
-  }));
-
-  const renderNavBtn = (item) => `
-    <button class="nav-button ${item.id === state.activeSection ? "active" : ""}" data-section="${escapeAttribute(item.id)}" type="button">
-      <span class="nav-button-label">
-        <i data-lucide="${escapeAttribute(item.icon)}"></i>
-        <span>${escapeHtml(item.title)}</span>
-      </span>
-      <span class="nav-count">${item.count}</span>
-    </button>
-  `;
-
-  sectionNav.innerHTML = `
-    ${topNavItems.map(renderNavBtn).join("")}
-    <div class="nav-group-label">分类目录</div>
-    ${sectionItems.map(renderNavBtn).join("")}
-  `;
-
-  sectionNav.querySelectorAll("button").forEach((button) => {
-    button.addEventListener("click", () => {
-      selectCatalogSection(button.dataset.section);
-    });
-  });
-
-  if (window.lucide) window.lucide.createIcons();
-}
-
 function selectCatalogSection(sectionId) {
   state.activeSection = sectionId || "all";
-  renderNavigation();
   renderCatalogToolbar();
   renderCatalog();
 }
@@ -737,9 +686,7 @@ function renderCatalogToolbar() {
   const pinnedCount = getValidPinnedEntries().length;
   const tabs = [
     { id: "all", title: "全部", count: total },
-    ...(pinnedCount > 0 || state.activeSection === "pinned"
-      ? [{ id: "pinned", title: "我的固定", count: pinnedCount }]
-      : []),
+    { id: "pinned", title: "我的固定", count: pinnedCount },
     ...state.catalog.map((section) => ({
       id: section.id,
       title: section.title,
@@ -748,7 +695,7 @@ function renderCatalogToolbar() {
   ];
 
   catalogTabs.innerHTML = tabs.map((tab) => `
-    <button class="catalog-tab ${tab.id === state.activeSection ? "active" : ""}" type="button" role="tab" aria-selected="${tab.id === state.activeSection ? "true" : "false"}" data-section="${escapeAttribute(tab.id)}">
+    <button class="catalog-tab ${tab.id === state.activeSection ? "active" : ""}" type="button" aria-pressed="${tab.id === state.activeSection}" data-section="${escapeAttribute(tab.id)}">
       <span>${escapeHtml(tab.title)}</span>
       <span class="catalog-tab-count">${tab.count}</span>
     </button>
@@ -757,6 +704,7 @@ function renderCatalogToolbar() {
   catalogTabs.querySelectorAll(".catalog-tab").forEach((button) => {
     button.addEventListener("click", () => {
       selectCatalogSection(button.dataset.section);
+      catalogTabs.querySelector(".active")?.focus({ preventScroll: true });
     });
   });
 }
@@ -2734,7 +2682,6 @@ function setAssistantExpanded(isExpanded) {
   assistantPanel.classList.toggle("is-expanded", isExpanded);
   assistantHome?.classList.toggle("has-conversation", isExpanded);
   if (isExpanded) hideCommandMatches();
-  assistantToggle?.parentElement?.classList.toggle("inline-panel-expanded", isExpanded);
   if (assistantClose) {
     assistantClose.setAttribute("aria-label", "收起首页对话");
     assistantClose.setAttribute("title", "收起首页对话");
@@ -2750,7 +2697,6 @@ function dockAssistantInline(expand = true) {
   assistantPanel.classList.remove("is-floating");
   assistantHome?.classList.remove("assistant-is-floating");
   assistantToggle?.parentElement?.classList.remove("has-floating-panel");
-  assistantToggle?.parentElement?.style.removeProperty("--assistant-floating-panel-width");
   assistantPanel.classList.add("open");
   assistantPanel.setAttribute("aria-hidden", "false");
   setAssistantExpanded(expand);
@@ -2770,12 +2716,7 @@ function floatAssistant() {
   assistantPanel.setAttribute("aria-hidden", "false");
   assistantHome?.classList.add("has-conversation");
   assistantHome?.classList.add("assistant-is-floating");
-  assistantToggle?.parentElement?.classList.remove("inline-panel-expanded");
   assistantToggle?.parentElement?.classList.add("has-floating-panel");
-  assistantToggle?.parentElement?.style.setProperty(
-    "--assistant-floating-panel-width",
-    `${Math.round(assistantPanel.getBoundingClientRect().width)}px`,
-  );
   assistantToggle?.setAttribute("aria-expanded", "true");
   const assistantTitle = (window.IntelligenceHubConfig || {}).assistantTitle || "智能问答";
   assistantToggle?.setAttribute("aria-label", `将${assistantTitle}放回首页`);
@@ -2809,9 +2750,6 @@ function initAssistantResize() {
     const nextHeight = clamp(height, minHeight, maxHeight);
     assistantPanel.style.width = `${nextWidth}px`;
     assistantPanel.style.height = `${nextHeight}px`;
-    if (assistantPanel.classList.contains("is-floating")) {
-      assistantToggle?.parentElement?.style.setProperty("--assistant-floating-panel-width", `${nextWidth}px`);
-    }
     assistantResizeHandle.setAttribute("aria-label", `当前窗口宽 ${nextWidth} 像素、高 ${nextHeight} 像素；拖动或使用方向键调整`);
     if (persist) {
       try {
@@ -2904,17 +2842,9 @@ function registerServiceWorker() {
   });
 }
 
-async function tryOpenAdmin() {
-  try {
-    const response = await fetch("/api/check-auth", { cache: "no-store" });
-    if (!response.ok) return;
-    const data = await response.json();
-    if (data.authenticated) {
-      window.location.href = "/admin";
-    }
-  } catch (err) {
-    // 未授权或网络异常时保持静默。
-  }
+function setAccountMenu(open) {
+  accountMenu.hidden = !open;
+  accountToggle.setAttribute("aria-expanded", String(open));
 }
 
 assistantToggle.addEventListener("click", () => {
@@ -2997,12 +2927,22 @@ document.addEventListener("click", (event) => {
   }
 });
 
-commandFocusBtn?.addEventListener("click", () => focusCommandInput());
 summaryRefreshBtn?.addEventListener("click", () => loadHomeSummary({ forceRefresh: true }));
 
-adminEntry.addEventListener("click", tryOpenAdmin);
+accountToggle.addEventListener("click", () => setAccountMenu(accountMenu.hidden));
+document.addEventListener("click", (event) => {
+  if (!accountMenu.hidden && !event.target.closest(".account-profile")) setAccountMenu(false);
+});
+document.addEventListener("focusin", (event) => {
+  if (!accountMenu.hidden && !event.target.closest(".account-profile")) setAccountMenu(false);
+});
 
 document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !accountMenu.hidden) {
+    setAccountMenu(false);
+    accountToggle.focus();
+    return;
+  }
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
     event.preventDefault();
     focusCommandInput();
