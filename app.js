@@ -241,7 +241,7 @@ function renderBentoQuickCard() {
   const picked = [];
   const seen = new Set();
   const addByName = (name) => {
-    if (!name || seen.has(name) || picked.length >= 6) return;
+    if (!name || seen.has(name) || picked.length >= 4) return;
     const entry = byName.get(name);
     if (!entry) return;
     seen.add(name);
@@ -398,27 +398,28 @@ function renderHomeBento() {
       const countSuffix = workflowData.truncated ? "+" : "";
       if (items.length > 0) {
         setBadgeState(bentoWorkflowBadge, `${totalCount}${countSuffix} 条审批中`, "is-warn");
-        bentoWorkflowBody.innerHTML = items.slice(0, 2).map((item) => {
-          const title = item.processName || item.billNumber || "审批流程";
-          const node = item.currentNode || "审批中";
-          const reviewer = item.reviewer || "待分配";
-          const shortTime = formatWorkflowTime(item.arrivedAt || item.createdAt);
-          const tooltip = [title, item.billNumber, node, `审核人：${reviewer}`].filter(Boolean).join(" · ");
-          return `
-            <button class="workflow-item" type="button" data-quick-action="workflow-detail" title="${escapeAttribute(tooltip)}">
-              <span class="workflow-item-head">
-                <strong class="workflow-item-name">${escapeHtml(title)}</strong>
-                ${shortTime ? `<span class="workflow-item-time">${escapeHtml(shortTime)}</span>` : ""}
-              </span>
-              <span class="workflow-item-meta">
-                <span class="bento-sub-tag workflow-node-tag">${escapeHtml(node)}</span>
-                <span class="workflow-reviewer">审核人：<strong>${escapeHtml(reviewer)}</strong></span>
-              </span>
-            </button>
-          `;
-        }).join("");
+        const first = items[0];
+        const title = first.processName || first.billNumber || "审批流程";
+        const node = first.currentNode || "审批中";
+        const reviewer = first.reviewer || "待分配";
+        const shortTime = formatWorkflowTime(first.arrivedAt || first.createdAt);
+        const tooltip = [title, first.billNumber, node, `审核人：${reviewer}`].filter(Boolean).join(" · ");
+        const moreCount = Math.max(0, totalCount - 1);
+        bentoWorkflowBody.innerHTML = `
+          <button class="workflow-item" type="button" data-quick-action="workflow-detail" title="${escapeAttribute(tooltip)}">
+            <span class="workflow-item-head">
+              <strong class="workflow-item-name">${escapeHtml(title)}</strong>
+              ${shortTime ? `<span class="workflow-item-time">${escapeHtml(shortTime)}</span>` : ""}
+            </span>
+            <span class="workflow-item-meta">
+              <span class="bento-sub-tag workflow-node-tag">${escapeHtml(node)}</span>
+              <span class="workflow-reviewer">审核人：<strong>${escapeHtml(reviewer)}</strong></span>
+            </span>
+          </button>
+          ${moreCount > 0 ? `<p class="bento-sub-line">另有 ${escapeHtml(String(moreCount))}${countSuffix} 条审批中，点击查看全部</p>` : ""}
+        `;
         if (bentoWorkflowDetailBtn) {
-          bentoWorkflowDetailBtn.textContent = totalCount > 2 ? `全部 (${totalCount}${countSuffix})` : "审批明细";
+          bentoWorkflowDetailBtn.textContent = totalCount > 1 ? `全部 (${totalCount}${countSuffix})` : "审批明细";
         }
       } else {
         setBadgeState(bentoWorkflowBadge, "无在审", "is-ok");
