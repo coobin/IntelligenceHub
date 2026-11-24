@@ -202,7 +202,6 @@ function renderWorkspaceHeader() {
   const now = new Date();
   const name = state.displayName || state.user;
   document.querySelector("#accountName").textContent = name || "访客";
-  if (name) document.querySelector("#accountAvatar").textContent = Array.from(name)[0].toUpperCase();
   if (workspaceDate) {
     const weekdays = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
     workspaceDate.textContent = `${now.getMonth() + 1}月${now.getDate()}日 ${weekdays[now.getDay()]}`;

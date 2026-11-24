@@ -124,46 +124,68 @@ input {
 }
 
 .workspace-date {
-  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
   color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.workspace-date::after {
+  content: "";
+  width: 1px;
+  height: 13px;
+  background: var(--line);
 }
 
 .account-tools, .account-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
 }
 
 .account-profile { position: relative; }
 .account-toggle {
   color: var(--navy);
   font-weight: 600;
-  font-size: 14px;
+  font-size: 13.5px;
   border: 0;
   background: transparent;
-  border-radius: 8px;
-  padding: 4px;
+  border-radius: 999px;
+  padding: 3px 8px 3px 4px;
+  gap: 6px;
+  transition: background 0.16s ease;
 }
 .account-toggle:enabled { cursor: pointer; }
+.account-toggle:enabled:hover,
+.account-toggle:enabled[aria-expanded="true"] {
+  background: rgba(15, 23, 42, 0.05);
+}
 .account-toggle:enabled::after {
   content: "";
-  width: 6px;
-  height: 6px;
-  margin: 0 4px;
-  border: solid currentColor;
-  border-width: 0 1px 1px 0;
+  width: 5px;
+  height: 5px;
+  margin: 0 2px 2px 0;
+  border: solid var(--muted);
+  border-width: 0 1.5px 1.5px 0;
   transform: rotate(45deg);
+  transition: transform 0.16s ease;
+}
+.account-toggle:enabled[aria-expanded="true"]::after {
+  transform: rotate(-135deg);
+  margin-bottom: -1px;
 }
 .account-avatar {
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  background: #e7effa;
-  color: var(--blue);
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--accent);
 }
-.account-avatar svg { width: 16px; height: 16px; }
+.account-avatar svg { width: 13.5px; height: 13.5px; }
 #accountName {
   max-width: min(24vw, 180px);
   overflow: hidden;
@@ -197,21 +219,21 @@ input {
 .assistant-panel.is-expanded #commandShortcutHint { display: none; }
 
 .topbar-icon-btn {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  border: 1px solid var(--line);
-  background: var(--surface);
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 0;
+  background: transparent;
   color: var(--muted);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: border-color 0.16s ease, color 0.16s ease, background 0.16s ease;
+  transition: color 0.16s ease, background 0.16s ease;
 }
 
 .topbar-icon-btn:hover {
-  border-color: var(--accent);
+  background: rgba(37, 99, 235, 0.08);
   color: var(--accent);
 }
 
