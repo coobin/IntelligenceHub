@@ -21,6 +21,10 @@ window.IntelligenceHubConfig = {
 
   // 首页工作台 Bento 轻状态区
   homeSummaryEnabled: true,
+  homeWorkflowCardEnabled: true,
   homeMeetingCardEnabled: true,
-  homeExpenseCardEnabled: true
+  homeExpenseCardEnabled: true,
+
+  // 金蝶流程查询台跳转地址（公开留空，在 config.local.js 配置）
+  workflowQueryUrl: ""
 };

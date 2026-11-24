@@ -471,9 +471,7 @@ p {
   gap: 14px;
   margin-top: 18px;
 }
-.bento-card-quick { grid-column: span 2; }
 .home-bento:has(.bento-card[hidden]) { grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); }
-.home-bento:has(.bento-card[hidden]) .bento-card-quick { grid-column: auto; }
 
 .home-bento[hidden] {
   display: none;
@@ -523,6 +521,10 @@ p {
 
 .bento-card-quick .bento-card-title svg {
   color: #d97706;
+}
+
+.bento-card-workflow .bento-card-title svg {
+  color: #4f46e5;
 }
 
 .bento-badge {
@@ -621,6 +623,10 @@ p {
 }
 
 .bento-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
   border: 1px solid #dbe4f0;
   background: #f8fafd;
   color: #334155;
@@ -652,9 +658,81 @@ p {
 .bento-quick-grid {
   flex: 1;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 7px;
   align-content: start;
+}
+
+.workflow-item {
+  width: 100%;
+  text-align: left;
+  border: 1px solid #e6ecf5;
+  background: #f8fafd;
+  border-radius: 9px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.workflow-item:hover {
+  border-color: #818cf8;
+  background: #f5f7ff;
+}
+
+.workflow-item-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+}
+
+.workflow-item-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.workflow-item-time {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.workflow-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+
+.workflow-node-tag {
+  max-width: 52%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workflow-reviewer {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.workflow-reviewer strong {
+  color: var(--text);
+  font-weight: 600;
 }
 
 .bento-quick-tile {
@@ -2695,12 +2773,8 @@ p {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .bento-card-quick {
-    grid-column: span 2;
-  }
-
   .bento-quick-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -2731,10 +2805,6 @@ p {
 
   .home-bento {
     grid-template-columns: 1fr;
-  }
-
-  .bento-card-quick {
-    grid-column: auto;
   }
 
   .bento-quick-grid {
@@ -3014,6 +3084,74 @@ p {
   line-height: 1.5;
   max-height: 60vh;
   overflow-y: auto;
+}
+
+.workflow-modal-content {
+  max-width: 560px;
+}
+
+.workflow-modal-summary {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+.workflow-modal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.workflow-modal-item {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 11px 13px;
+  background: #f8fafd;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.workflow-modal-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.workflow-modal-item-title {
+  font-size: 14px;
+  color: var(--text);
+}
+
+.workflow-modal-item-bill {
+  font-size: 12px;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.workflow-modal-item-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.workflow-modal-item-times {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.workflow-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--line);
 }
 
 .invoice-detail-row {

@@ -13,11 +13,11 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./assets/icons/icon-192.png" type="image/png" />
     <link rel="apple-touch-icon" href="./assets/icons/apple-touch-icon.png" />
-    <link rel="stylesheet" href="./styles.css?v=20261124_06" />
+    <link rel="stylesheet" href="./styles.css?v=20261124_07" />
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://unpkg.com/marked@12.0.0/marked.min.js"></script>
     <script src="https://unpkg.com/dompurify@3.0.9/dist/purify.min.js"></script>
-    <script type="module" src="./app.js?v=20261124_06"></script>
+    <script type="module" src="./app.js?v=20261124_07"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -34,7 +34,7 @@
         <div class="account-tools">
           <span class="workspace-date" id="workspaceDate"></span>
           <button type="button" class="daily-photo-display" hidden aria-label="查看今日照片"><img alt="今日照片" loading="lazy" /></button>
-          <button class="topbar-icon-btn" id="summaryRefreshBtn" type="button" aria-label="刷新工作台状态" title="刷新今日日程与报销状态"><i data-lucide="refresh-cw"></i></button>
+          <button class="topbar-icon-btn" id="summaryRefreshBtn" type="button" aria-label="刷新工作台状态" title="刷新审批进度、今日日程与报销状态"><i data-lucide="refresh-cw"></i></button>
           <div class="account-profile">
             <button id="accountToggle" class="account-toggle" type="button" aria-controls="accountMenu" disabled>
               <span class="account-avatar" id="accountAvatar" aria-hidden="true"><i data-lucide="user-round"></i></span>
@@ -84,6 +84,20 @@
               </div>
               <div class="bento-quick-grid" id="bentoQuickBody">
                 <p class="bento-placeholder">加载常用入口…</p>
+              </div>
+            </article>
+
+            <article class="bento-card bento-card-workflow" id="bentoWorkflowCard">
+              <div class="bento-card-head">
+                <span class="bento-card-title"><i data-lucide="git-pull-request-arrow"></i>金蝶流程审批</span>
+                <span class="bento-badge" id="bentoWorkflowBadge">加载中</span>
+              </div>
+              <div class="bento-card-body" id="bentoWorkflowBody">
+                <p class="bento-placeholder">正在查询本人提交的审批流程…</p>
+              </div>
+              <div class="bento-card-actions">
+                <button class="bento-action-btn" id="bentoWorkflowDetailBtn" type="button" data-quick-action="workflow-detail">审批明细</button>
+                <a class="bento-action-btn bento-action-primary" id="bentoWorkflowPortalLink" href="#" target="_blank" rel="noopener noreferrer" hidden>金蝶查询台</a>
               </div>
             </article>
 
@@ -232,6 +246,21 @@
         </div>
         <div class="invoice-modal-footer" id="invoiceModalFooter">
           <!-- Dynamically filled -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Workflow Progress Modal -->
+    <div class="invoice-modal-overlay" id="workflowDetailModal" aria-hidden="true">
+      <div class="invoice-modal-content workflow-modal-content">
+        <div class="invoice-modal-header">
+          <h3><i data-lucide="git-pull-request-arrow"></i>我发起的金蝶流程审批进度</h3>
+          <button class="invoice-modal-close" id="workflowModalClose" type="button" aria-label="关闭">&times;</button>
+        </div>
+        <div class="invoice-modal-body workflow-modal-body" id="workflowModalBody"></div>
+        <div class="invoice-modal-footer workflow-modal-footer">
+          <button class="bento-action-btn" id="workflowModalRefreshBtn" type="button">刷新进度</button>
+          <a class="bento-action-btn bento-action-primary" id="workflowModalPortalLink" href="#" target="_blank" rel="noopener noreferrer" hidden>打开金蝶查询台</a>
         </div>
       </div>
     </div>

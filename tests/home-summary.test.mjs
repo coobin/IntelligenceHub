@@ -51,6 +51,8 @@ async function startTestServer(upstreamHandler, extraEnv = {}) {
       INVOICE_PORT: String(upstreamPort),
       CHENCY_MEET_API_URL: `http://127.0.0.1:${upstreamPort}`,
       CHENCY_MEET_AI_SECRET: "meet-secret",
+      KINGDEE_QUERY_API_URL: `http://127.0.0.1:${upstreamPort}`,
+      KINGDEE_QUERY_API_KEY: "kqh-secret",
       ADMIN_REMOTE_USER: "admin",
       ...extraEnv
     },
@@ -94,6 +96,36 @@ test("home-summary aggregates meetings, current-period expense, popular entries 
     if (req.url === "/api/auth/identity") {
       return res.end(JSON.stringify({ username: "zhangsan", name: "张三" }));
     }
+    if (req.url === "/api/dify/v1/query") {
+      return res.end(JSON.stringify({
+        answer: "找到 2 条正在审批的流程。",
+        data: {
+          tool: "workflow_progress",
+          count: 2,
+          truncated: false,
+          rows: [
+            {
+              "单据编号": "FYBX20261124001",
+              "流程名称": "费用报销单",
+              "当前节点": "部门主管审核",
+              "当前处理人": "王五",
+              "节点到达时间": "2026-11-24T09:30:00",
+              "发起时间": "2026-11-24T09:00:00",
+              "状态": "审批中"
+            },
+            {
+              "单据编号": "CGDD20261123008",
+              "流程名称": "采购申请单",
+              "当前节点": "财务复核",
+              "当前处理人": "赵六",
+              "节点到达时间": "2026-11-23T16:10:00",
+              "发起时间": "2026-11-23T14:00:00",
+              "状态": "审批中"
+            }
+          ]
+        }
+      }));
+    }
     if (req.url === "/api/ai/meetings-query") {
       return res.end(JSON.stringify({
         ok: true,
@@ -131,6 +163,7 @@ test("home-summary aggregates meetings, current-period expense, popular entries 
     assert.equal(anonRes.status, 200);
     const anonData = await anonRes.json();
     assert.equal(anonData.user, "");
+    assert.equal(anonData.workflows.status, "unauthenticated");
     assert.equal(anonData.meetings.status, "unauthenticated");
     assert.equal(anonData.expense.status, "unauthenticated");
     assert.deepEqual(anonData.popularNames, ["金蝶系统", "企业邮箱", "企业云盘"]);
@@ -145,6 +178,13 @@ test("home-summary aggregates meetings, current-period expense, popular entries 
     const cloudData = await cloudRes.json();
     assert.equal(cloudData.user, "zhangsan");
     assert.equal(cloudData.displayName, "张三");
+    assert.equal(cloudData.workflows.status, "ok");
+    assert.equal(cloudData.workflows.count, 2);
+    assert.equal(cloudData.workflows.truncated, false);
+    assert.equal(cloudData.workflows.items[0].billNumber, "FYBX20261124001");
+    assert.equal(cloudData.workflows.items[0].processName, "费用报销单");
+    assert.equal(cloudData.workflows.items[0].currentNode, "部门主管审核");
+    assert.equal(cloudData.workflows.items[0].reviewer, "王五");
     assert.equal(cloudData.meetings.status, "ok");
     assert.equal(cloudData.meetings.totalCount, 2);
     assert.equal(cloudData.meetings.nextMeeting?.title, "产品复盘");
@@ -159,6 +199,13 @@ test("home-summary aggregates meetings, current-period expense, popular entries 
       { period: previousPeriods[2], invoiceCount: 0, reimbursedAmount: 0, hasSharedPeriod: true }
     ]);
 
+    const workflowCall = server.calls.find((call) => call.url === "/api/dify/v1/query");
+    assert.equal(workflowCall.headers.authorization, "Bearer kqh-secret");
+    assert.equal(decodeURIComponent(workflowCall.headers["x-end-user"]), "张三");
+    assert.deepEqual(JSON.parse(workflowCall.body), {
+      tool: "workflow_progress",
+      arguments: { limit: 10 }
+    });
     const meetCall = server.calls.find((call) => call.url === "/api/ai/meetings-query");
     assert.equal(meetCall.headers["x-chency-user"], "zhangsan");
     assert.equal(JSON.parse(meetCall.body).queryScope, "mine");
@@ -183,10 +230,48 @@ test("home-summary degrades gracefully when upstream services fail", async () =>
     const data = await response.json();
     assert.equal(data.user, "lisi");
     assert.equal(data.displayName, "李四");
+    assert.equal(data.workflows.status, "unavailable");
     assert.equal(data.meetings.status, "unavailable");
     assert.equal(data.expense.status, "unavailable");
     assert.deepEqual(data.popularNames, ["金蝶系统", "企业邮箱", "企业云盘"]);
   } finally {
     await server.cleanup();
+  }
+});
+
+test("home-summary reports workflow forbidden and unconfigured states clearly", async () => {
+  const forbiddenServer = await startTestServer((req, res) => {
+    if (req.url === "/api/dify/v1/query") {
+      res.statusCode = 403;
+      res.setHeader("Content-Type", "application/json");
+      return res.end(JSON.stringify({ error: "module_forbidden" }));
+    }
+    res.statusCode = 502;
+    res.end("bad gateway");
+  });
+  try {
+    const res = await fetch(`${forbiddenServer.base}/api/home-summary`, {
+      headers: { "remote-user": "wangwu", "remote-name": encodeURIComponent("王五") }
+    });
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    assert.equal(data.workflows.status, "forbidden");
+  } finally {
+    await forbiddenServer.cleanup();
+  }
+
+  const unconfiguredServer = await startTestServer((req, res) => {
+    res.statusCode = 502;
+    res.end("bad gateway");
+  }, { KINGDEE_QUERY_API_URL: "", KINGDEE_QUERY_API_KEY: "" });
+  try {
+    const res = await fetch(`${unconfiguredServer.base}/api/home-summary`, {
+      headers: { "remote-user": "wangwu", "remote-name": encodeURIComponent("王五") }
+    });
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    assert.equal(data.workflows.status, "unconfigured");
+  } finally {
+    await unconfiguredServer.cleanup();
   }
 });

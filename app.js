@@ -64,6 +64,11 @@ const workspaceDate = document.querySelector("#workspaceDate");
 const commandShortcutHint = document.querySelector("#commandShortcutHint");
 const summaryRefreshBtn = document.querySelector("#summaryRefreshBtn");
 const homeBentoGrid = document.querySelector("#homeBentoGrid");
+const bentoWorkflowCard = document.querySelector("#bentoWorkflowCard");
+const bentoWorkflowBadge = document.querySelector("#bentoWorkflowBadge");
+const bentoWorkflowBody = document.querySelector("#bentoWorkflowBody");
+const bentoWorkflowDetailBtn = document.querySelector("#bentoWorkflowDetailBtn");
+const bentoWorkflowPortalLink = document.querySelector("#bentoWorkflowPortalLink");
 const bentoMeetingCard = document.querySelector("#bentoMeetingCard");
 const bentoMeetingBadge = document.querySelector("#bentoMeetingBadge");
 const bentoMeetingBody = document.querySelector("#bentoMeetingBody");
@@ -72,6 +77,11 @@ const bentoExpenseBadge = document.querySelector("#bentoExpenseBadge");
 const bentoExpenseBody = document.querySelector("#bentoExpenseBody");
 const bentoQuickBadge = document.querySelector("#bentoQuickBadge");
 const bentoQuickBody = document.querySelector("#bentoQuickBody");
+const workflowDetailModal = document.querySelector("#workflowDetailModal");
+const workflowModalBody = document.querySelector("#workflowModalBody");
+const workflowModalClose = document.querySelector("#workflowModalClose");
+const workflowModalRefreshBtn = document.querySelector("#workflowModalRefreshBtn");
+const workflowModalPortalLink = document.querySelector("#workflowModalPortalLink");
 const ASSISTANT_SIZE_STORAGE_KEY = "intelligence-hub.assistant-size.v1";
 const PINNED_ENTRIES_STORAGE_PREFIX = "intelligence-hub.pinned.v1";
 const LOCAL_CLICKS_STORAGE_PREFIX = "intelligence-hub.local-clicks.v1";
@@ -278,16 +288,164 @@ function renderBentoQuickCard() {
   if (window.lucide) window.lucide.createIcons();
 }
 
+function formatWorkflowTime(raw, { includeYear = false } = {}) {
+  const text = String(raw || "").trim();
+  const match = text.match(/^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}:\d{2})/);
+  if (!match) return text.slice(0, 16);
+  return includeYear ? `${match[1]}-${match[2]}-${match[3]} ${match[4]}` : `${match[2]}-${match[3]} ${match[4]}`;
+}
+
+function resolveWorkflowPortalUrl() {
+  const config = window.IntelligenceHubConfig || {};
+  const configured = safeHttpUrl(config.workflowQueryUrl);
+  return configured && configured !== "#" ? configured : "";
+}
+
+function renderWorkflowModalBody() {
+  if (!workflowModalBody) return;
+  const workflowData = state.homeSummary?.workflows;
+  if (!state.homeSummary) {
+    workflowModalBody.innerHTML = `<p class="bento-placeholder">正在加载金蝶审批流程…</p>`;
+    return;
+  }
+  if (workflowData?.status === "ok") {
+    const items = Array.isArray(workflowData.items) ? workflowData.items : [];
+    if (items.length === 0) {
+      workflowModalBody.innerHTML = `<p class="bento-placeholder">你当前没有正在审批中的金蝶流程。</p>`;
+      return;
+    }
+    workflowModalBody.innerHTML = `
+      <div class="workflow-modal-summary">共 ${escapeHtml(String(workflowData.count ?? items.length))}${workflowData.truncated ? "+" : ""} 条本人发起且正在审批的流程</div>
+      <div class="workflow-modal-list">
+        ${items.map((item) => {
+          const title = item.processName || item.billNumber || "未命名流程";
+          const node = item.currentNode || "审批中";
+          const reviewer = item.reviewer || "待分配";
+          const arrived = formatWorkflowTime(item.arrivedAt, { includeYear: true });
+          const created = formatWorkflowTime(item.createdAt, { includeYear: true });
+          return `
+            <div class="workflow-modal-item">
+              <div class="workflow-modal-item-head">
+                <strong class="workflow-modal-item-title">${escapeHtml(title)}</strong>
+                <span class="bento-badge is-warn">${escapeHtml(item.status || "审批中")}</span>
+              </div>
+              ${item.billNumber ? `<div class="workflow-modal-item-bill">单据编号：${escapeHtml(item.billNumber)}</div>` : ""}
+              <div class="workflow-modal-item-meta">
+                <span class="bento-sub-tag">${escapeHtml(node)}</span>
+                <span class="workflow-reviewer">当前审核人：<strong>${escapeHtml(reviewer)}</strong></span>
+              </div>
+              <div class="workflow-modal-item-times">
+                ${arrived ? `<span>到达当前节点：${escapeHtml(arrived)}</span>` : ""}
+                ${created ? `<span>发起时间：${escapeHtml(created)}</span>` : ""}
+              </div>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    `;
+    return;
+  }
+  if (workflowData?.status === "forbidden") {
+    workflowModalBody.innerHTML = `<p class="bento-placeholder">当前账号暂无审批进度查询权限。</p>`;
+  } else if (workflowData?.status === "unauthenticated") {
+    workflowModalBody.innerHTML = `<p class="bento-placeholder">登录后可查看本人提交的金蝶流程审批进度。</p>`;
+  } else {
+    workflowModalBody.innerHTML = `<p class="bento-placeholder">暂时无法获取金蝶审批进度，请稍后刷新重试。</p>`;
+  }
+}
+
+function openWorkflowDetailModal() {
+  if (!workflowDetailModal) return;
+  const portalUrl = resolveWorkflowPortalUrl();
+  if (workflowModalPortalLink) {
+    workflowModalPortalLink.hidden = !portalUrl;
+    if (portalUrl) workflowModalPortalLink.href = portalUrl;
+  }
+  renderWorkflowModalBody();
+  workflowDetailModal.setAttribute("aria-hidden", "false");
+}
+
+function closeWorkflowDetailModal() {
+  if (!workflowDetailModal) return;
+  workflowDetailModal.setAttribute("aria-hidden", "true");
+}
+
 function renderHomeBento() {
   const config = window.IntelligenceHubConfig || {};
   const enabled = config.homeSummaryEnabled !== false;
   if (homeBentoGrid) homeBentoGrid.hidden = !enabled;
   if (!enabled) return;
 
+  if (bentoWorkflowCard) bentoWorkflowCard.hidden = config.homeWorkflowCardEnabled === false;
   if (bentoMeetingCard) bentoMeetingCard.hidden = config.homeMeetingCardEnabled === false;
   if (bentoExpenseCard) bentoExpenseCard.hidden = config.homeExpenseCardEnabled === false;
 
   const summary = state.homeSummary;
+  const workflowData = summary?.workflows;
+  if (bentoWorkflowBody && config.homeWorkflowCardEnabled !== false) {
+    const portalUrl = resolveWorkflowPortalUrl();
+    if (bentoWorkflowPortalLink) {
+      bentoWorkflowPortalLink.hidden = !portalUrl;
+      if (portalUrl) bentoWorkflowPortalLink.href = portalUrl;
+    }
+    if (!summary) {
+      setBadgeState(bentoWorkflowBadge, "加载中", "is-muted");
+      bentoWorkflowBody.innerHTML = `<p class="bento-placeholder">正在查询本人提交的审批流程…</p>`;
+      if (bentoWorkflowDetailBtn) bentoWorkflowDetailBtn.textContent = "审批明细";
+    } else if (workflowData?.status === "ok") {
+      const items = Array.isArray(workflowData.items) ? workflowData.items : [];
+      const totalCount = Number(workflowData.count ?? items.length);
+      const countSuffix = workflowData.truncated ? "+" : "";
+      if (items.length > 0) {
+        setBadgeState(bentoWorkflowBadge, `${totalCount}${countSuffix} 条审批中`, "is-warn");
+        bentoWorkflowBody.innerHTML = items.slice(0, 2).map((item) => {
+          const title = item.processName || item.billNumber || "审批流程";
+          const node = item.currentNode || "审批中";
+          const reviewer = item.reviewer || "待分配";
+          const shortTime = formatWorkflowTime(item.arrivedAt || item.createdAt);
+          const tooltip = [title, item.billNumber, node, `审核人：${reviewer}`].filter(Boolean).join(" · ");
+          return `
+            <button class="workflow-item" type="button" data-quick-action="workflow-detail" title="${escapeAttribute(tooltip)}">
+              <span class="workflow-item-head">
+                <strong class="workflow-item-name">${escapeHtml(title)}</strong>
+                ${shortTime ? `<span class="workflow-item-time">${escapeHtml(shortTime)}</span>` : ""}
+              </span>
+              <span class="workflow-item-meta">
+                <span class="bento-sub-tag workflow-node-tag">${escapeHtml(node)}</span>
+                <span class="workflow-reviewer">审核人：<strong>${escapeHtml(reviewer)}</strong></span>
+              </span>
+            </button>
+          `;
+        }).join("");
+        if (bentoWorkflowDetailBtn) {
+          bentoWorkflowDetailBtn.textContent = totalCount > 2 ? `全部 (${totalCount}${countSuffix})` : "审批明细";
+        }
+      } else {
+        setBadgeState(bentoWorkflowBadge, "无在审", "is-ok");
+        bentoWorkflowBody.innerHTML = `
+          <p class="bento-primary-line">暂无正在审批的流程</p>
+          <p class="bento-sub-line">本人提交的在审流程会展示当前节点与审核人</p>
+        `;
+        if (bentoWorkflowDetailBtn) bentoWorkflowDetailBtn.textContent = "审批明细";
+      }
+    } else if (workflowData?.status === "forbidden") {
+      setBadgeState(bentoWorkflowBadge, "无权限", "is-muted");
+      bentoWorkflowBody.innerHTML = `<p class="bento-placeholder">当前账号暂无审批进度查询权限。</p>`;
+      if (bentoWorkflowDetailBtn) bentoWorkflowDetailBtn.textContent = "审批明细";
+    } else if (workflowData?.status === "unauthenticated") {
+      setBadgeState(bentoWorkflowBadge, "待登录", "is-muted");
+      bentoWorkflowBody.innerHTML = `<p class="bento-placeholder">登录后可查看本人提交的审批进度。</p>`;
+      if (bentoWorkflowDetailBtn) bentoWorkflowDetailBtn.textContent = "审批明细";
+    } else {
+      setBadgeState(bentoWorkflowBadge, "暂不可用", "is-muted");
+      bentoWorkflowBody.innerHTML = `<p class="bento-placeholder">暂时无法获取金蝶审批进度，可稍后刷新重试。</p>`;
+      if (bentoWorkflowDetailBtn) bentoWorkflowDetailBtn.textContent = "审批明细";
+    }
+    if (workflowDetailModal?.getAttribute("aria-hidden") === "false") {
+      renderWorkflowModalBody();
+    }
+  }
+
   const meetingData = summary?.meetings;
   if (bentoMeetingBody && config.homeMeetingCardEnabled !== false) {
     if (!summary) {
@@ -372,12 +530,12 @@ async function loadHomeSummary({ forceRefresh = false } = {}) {
       }
       renderHomeBento();
     } else if (!state.homeSummary) {
-      state.homeSummary = { meetings: { status: "unavailable" }, expense: { status: "unavailable" }, popularNames: [] };
+      state.homeSummary = { workflows: { status: "unavailable" }, meetings: { status: "unavailable" }, expense: { status: "unavailable" }, popularNames: [] };
       renderHomeBento();
     }
   } catch {
     if (!state.homeSummary) {
-      state.homeSummary = { meetings: { status: "unavailable" }, expense: { status: "unavailable" }, popularNames: [] };
+      state.homeSummary = { workflows: { status: "unavailable" }, meetings: { status: "unavailable" }, expense: { status: "unavailable" }, popularNames: [] };
       renderHomeBento();
     }
   } finally {
@@ -2915,6 +3073,10 @@ document.addEventListener("click", (event) => {
     document.querySelector("#nativeUploadBtn")?.click();
     return;
   }
+  if (actionTrigger?.dataset.quickAction === "workflow-detail") {
+    openWorkflowDetailModal();
+    return;
+  }
   const densityBtn = event.target.closest(".density-btn");
   if (densityBtn && densityBtn.dataset.density) {
     state.density = densityBtn.dataset.density === "comfortable" ? "comfortable" : "compact";
@@ -2928,6 +3090,11 @@ document.addEventListener("click", (event) => {
 });
 
 summaryRefreshBtn?.addEventListener("click", () => loadHomeSummary({ forceRefresh: true }));
+workflowModalClose?.addEventListener("click", closeWorkflowDetailModal);
+workflowModalRefreshBtn?.addEventListener("click", () => loadHomeSummary({ forceRefresh: true }));
+workflowDetailModal?.addEventListener("click", (event) => {
+  if (event.target === workflowDetailModal) closeWorkflowDetailModal();
+});
 
 accountToggle.addEventListener("click", () => setAccountMenu(accountMenu.hidden));
 document.addEventListener("click", (event) => {
@@ -2958,6 +3125,10 @@ document.addEventListener("keydown", (event) => {
     }
   }
   if (event.key === "Escape") {
+    if (workflowDetailModal?.getAttribute("aria-hidden") === "false") {
+      closeWorkflowDetailModal();
+      return;
+    }
     if (commandMatchPanel && !commandMatchPanel.hidden) {
       hideCommandMatches();
       return;

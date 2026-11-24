@@ -367,6 +367,63 @@ async function fetchExpenseSummary(username, currentPeriod) {
   }
 }
 
+function resolveKingdeeWorkflowUser(req, username, displayName) {
+  const source = String(process.env.KINGDEE_QUERY_USER_SOURCE || "remote_name").trim().toLowerCase();
+  if (source === "remote_user") return username;
+  if (source === "kingdee_header") {
+    return decodeHeaderText(req.headers["remote-kingdee-username"]) || displayName || username;
+  }
+  return displayName || username;
+}
+
+async function fetchWorkflowSummary(kingdeeUser) {
+  const apiBase = String(process.env.KINGDEE_QUERY_API_URL || "").replace(/\/$/, "");
+  const apiKey = process.env.KINGDEE_QUERY_API_KEY || "";
+  if (!apiBase || !apiKey) return { status: "unconfigured" };
+  const user = truncateText(kingdeeUser, 80);
+  if (!user) return { status: "unavailable" };
+
+  const userHeader = String(process.env.KINGDEE_QUERY_USER_HEADER || "x-end-user").trim() || "x-end-user";
+  try {
+    const response = await fetch(`${apiBase}/api/dify/v1/query`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+        [userHeader]: encodeURIComponent(user),
+      },
+      body: JSON.stringify({
+        tool: "workflow_progress",
+        arguments: { limit: 10 },
+      }),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (response.status === 403) return { status: "forbidden" };
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload?.data || !Array.isArray(payload.data.rows)) {
+      return { status: "unavailable" };
+    }
+    const items = payload.data.rows.map((row) => ({
+      billNumber: truncateText(row?.["单据编号"], 60),
+      processName: truncateText(row?.["流程名称"], 80),
+      currentNode: truncateText(row?.["当前节点"], 80),
+      reviewer: truncateText(row?.["当前处理人"], 120),
+      arrivedAt: truncateText(row?.["节点到达时间"], 40),
+      createdAt: truncateText(row?.["发起时间"], 40),
+      status: truncateText(row?.["状态"], 30) || "审批中",
+    }));
+    return {
+      status: "ok",
+      count: Number(payload.data.count ?? items.length),
+      truncated: Boolean(payload.data.truncated),
+      items,
+    };
+  } catch (error) {
+    console.error("Home summary workflow fetch failed:", error.name || error.message);
+    return { status: "unavailable" };
+  }
+}
+
 import http from "http";
 
 // 鉴权中间件
@@ -849,7 +906,7 @@ app.get("/api/check-auth", (req, res) => {
   res.json({ authenticated, user: req.assistantIdentity?.username || remoteUser });
 });
 
-// 首页工作台轻量聚合概览（个人今日日程、当月通讯费报销状态与热门入口）
+// 首页工作台轻量聚合概览（金蝶流程审批、个人今日日程、通讯费报销状态与热门入口）
 app.get("/api/home-summary", async (req, res) => {
   const username = assistantUser(req);
   const hasUser = Boolean(username && username !== "anonymous");
@@ -871,6 +928,7 @@ app.get("/api/home-summary", async (req, res) => {
       today: todayIso,
       currentPeriod,
       popularNames,
+      workflows: { status: "unauthenticated" },
       meetings: { status: "unauthenticated" },
       expense: { status: "unauthenticated", currentPeriod },
     });
@@ -887,7 +945,9 @@ app.get("/api/home-summary", async (req, res) => {
     }
   }
 
-  const [meetingsResult, expenseResult] = await Promise.allSettled([
+  const kingdeeUser = resolveKingdeeWorkflowUser(req, username, displayName);
+  const [workflowsResult, meetingsResult, expenseResult] = await Promise.allSettled([
+    fetchWorkflowSummary(kingdeeUser),
     fetchTodayMeetingSummary(username, displayName, todayIso, nowTime),
     fetchExpenseSummary(username, currentPeriod),
   ]);
@@ -898,6 +958,7 @@ app.get("/api/home-summary", async (req, res) => {
     today: todayIso,
     currentPeriod,
     popularNames,
+    workflows: workflowsResult.status === "fulfilled" ? workflowsResult.value : { status: "unavailable" },
     meetings: meetingsResult.status === "fulfilled" ? meetingsResult.value : { status: "unavailable" },
     expense: expenseResult.status === "fulfilled" ? expenseResult.value : { status: "unavailable", currentPeriod },
   };
