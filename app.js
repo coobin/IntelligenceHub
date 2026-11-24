@@ -38,19 +38,495 @@ function getIcon(name, customIcon) {
 const state = {
   catalog: [],
   activeSection: "all",
-  query: ""
+  query: "",
+  user: "",
+  displayName: "",
+  pinnedNames: [],
+  localClicks: {},
+  density: "compact",
+  homeSummary: null,
+  commandMatches: [],
+  activeCommandIndex: -1
 };
 
 const sectionNav = document.querySelector("#sectionNav");
 const catalogArea = document.querySelector("#catalogArea");
+const catalogTabs = document.querySelector("#catalogTabs");
 const assistantToggle = document.querySelector("#assistantToggle");
 const assistantClose = document.querySelector("#assistantClose");
 const assistantPanel = document.querySelector("#assistantPanel");
 const assistantResizeHandle = document.querySelector("#assistantResizeHandle");
 const assistantHome = document.querySelector("#assistantHome");
 const assistantInlineMount = document.querySelector("#assistantInlineMount");
+const commandMatchPanel = document.querySelector("#commandMatchPanel");
+const workspaceGreeting = document.querySelector("#workspaceGreeting");
+const workspaceDate = document.querySelector("#workspaceDate");
+const commandFocusBtn = document.querySelector("#commandFocusBtn");
+const commandShortcutHint = document.querySelector("#commandShortcutHint");
+const summaryRefreshBtn = document.querySelector("#summaryRefreshBtn");
+const homeBentoGrid = document.querySelector("#homeBentoGrid");
+const bentoMeetingCard = document.querySelector("#bentoMeetingCard");
+const bentoMeetingBadge = document.querySelector("#bentoMeetingBadge");
+const bentoMeetingBody = document.querySelector("#bentoMeetingBody");
+const bentoExpenseCard = document.querySelector("#bentoExpenseCard");
+const bentoExpenseBadge = document.querySelector("#bentoExpenseBadge");
+const bentoExpenseBody = document.querySelector("#bentoExpenseBody");
+const bentoQuickBadge = document.querySelector("#bentoQuickBadge");
+const bentoQuickBody = document.querySelector("#bentoQuickBody");
 const adminEntry = document.querySelector("#adminEntry");
 const ASSISTANT_SIZE_STORAGE_KEY = "intelligence-hub.assistant-size.v1";
+const PINNED_ENTRIES_STORAGE_PREFIX = "intelligence-hub.pinned.v1";
+const LOCAL_CLICKS_STORAGE_PREFIX = "intelligence-hub.local-clicks.v1";
+const CATALOG_DENSITY_STORAGE_KEY = "intelligence-hub.density.v1";
+
+const SEARCH_ALIAS_KEYWORDS = {
+  jd: ["金蝶", "erp", "星空"],
+  erp: ["金蝶", "erp", "财务"],
+  bx: ["报销", "发票", "通讯费"],
+  fp: ["发票", "报销"],
+  hy: ["会议", "日程", "希会"],
+  yx: ["邮箱", "邮件"],
+  yp: ["云盘", "网盘", "文件"],
+  kq: ["考勤", "打卡", "人事", "薪人"],
+  hr: ["人事", "考勤", "薪酬", "薪人"],
+  sp: ["审批", "流程", "oa"],
+  oa: ["办公", "审批", "云之家"],
+  wx: ["微信"],
+  dd: ["钉钉"],
+  mcp: ["mcp", "接入", "助手"]
+};
+
+let dispatchAssistantPrompt = null;
+
+function userPrefSuffix() {
+  return encodeURIComponent(state.user || "anonymous");
+}
+
+function loadUserWorkbenchPrefs() {
+  try {
+    const rawPinned = JSON.parse(localStorage.getItem(`${PINNED_ENTRIES_STORAGE_PREFIX}:${userPrefSuffix()}`) || "[]");
+    state.pinnedNames = Array.isArray(rawPinned) ? rawPinned.filter((name) => typeof name === "string" && name.trim()) : [];
+  } catch {
+    state.pinnedNames = [];
+  }
+
+  try {
+    const rawClicks = JSON.parse(localStorage.getItem(`${LOCAL_CLICKS_STORAGE_PREFIX}:${userPrefSuffix()}`) || "{}");
+    state.localClicks = rawClicks && typeof rawClicks === "object" && !Array.isArray(rawClicks) ? rawClicks : {};
+  } catch {
+    state.localClicks = {};
+  }
+
+  try {
+    const storedDensity = localStorage.getItem(CATALOG_DENSITY_STORAGE_KEY);
+    state.density = storedDensity === "comfortable" ? "comfortable" : "compact";
+  } catch {
+    state.density = "compact";
+  }
+}
+
+function savePinnedNames() {
+  try {
+    localStorage.setItem(`${PINNED_ENTRIES_STORAGE_PREFIX}:${userPrefSuffix()}`, JSON.stringify(state.pinnedNames));
+  } catch {}
+}
+
+function saveLocalClicks() {
+  try {
+    localStorage.setItem(`${LOCAL_CLICKS_STORAGE_PREFIX}:${userPrefSuffix()}`, JSON.stringify(state.localClicks));
+  } catch {}
+}
+
+function saveDensityPref() {
+  try {
+    localStorage.setItem(CATALOG_DENSITY_STORAGE_KEY, state.density);
+  } catch {}
+}
+
+function flattenCatalogItems() {
+  const flattened = [];
+  state.catalog.forEach((section, sectionIndex) => {
+    (section.items || []).forEach((item) => {
+      flattened.push({
+        item,
+        sectionId: section.id,
+        sectionTitle: section.title || "",
+        toneClass: `tone-${sectionIndex % 5}`
+      });
+    });
+  });
+  return flattened;
+}
+
+function getValidPinnedEntries() {
+  const byName = new Map();
+  flattenCatalogItems().forEach((entry) => {
+    if (!byName.has(entry.item.name)) byName.set(entry.item.name, entry);
+  });
+  return state.pinnedNames
+    .map((name) => byName.get(name))
+    .filter(Boolean);
+}
+
+function togglePinEntry(entryName) {
+  if (!entryName) return;
+  const index = state.pinnedNames.indexOf(entryName);
+  if (index >= 0) {
+    state.pinnedNames.splice(index, 1);
+  } else {
+    state.pinnedNames.unshift(entryName);
+    if (state.pinnedNames.length > 24) state.pinnedNames = state.pinnedNames.slice(0, 24);
+  }
+  savePinnedNames();
+  renderNavigation();
+  renderCatalogToolbar();
+  renderBentoQuickCard();
+  renderCatalog();
+}
+
+function recordLocalClick(entryName) {
+  if (!entryName) return;
+  state.localClicks[entryName] = (Number(state.localClicks[entryName]) || 0) + 1;
+  saveLocalClicks();
+  renderBentoQuickCard();
+}
+
+function renderWorkspaceHeader() {
+  const now = new Date();
+  const hour = now.getHours();
+  const timeGreeting = hour >= 5 && hour < 12
+    ? "上午好"
+    : hour >= 12 && hour < 14
+    ? "中午好"
+    : hour >= 14 && hour < 18
+    ? "下午好"
+    : hour >= 18 && hour < 23
+    ? "晚上好"
+    : "夜深了";
+  if (workspaceGreeting) {
+    workspaceGreeting.textContent = state.displayName ? `${timeGreeting}，${state.displayName}` : timeGreeting;
+  }
+  if (workspaceDate) {
+    const weekdays = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+    workspaceDate.textContent = `${now.getMonth() + 1}月${now.getDate()}日 ${weekdays[now.getDay()]}`;
+  }
+  if (commandShortcutHint) {
+    const isMac = /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent || "");
+    commandShortcutHint.textContent = isMac ? "⌘K" : "Ctrl K";
+  }
+}
+
+function formatBillingPeriodLabel(period) {
+  const matched = /^(\d{4})(\d{2})$/.exec(String(period || "").trim());
+  return matched ? `${matched[1]}年${Number(matched[2])}月` : String(period || "");
+}
+
+function formatCurrencyValue(value) {
+  const numeric = Number(value || 0);
+  return Number.isInteger(numeric) ? String(numeric) : numeric.toFixed(2).replace(/\.?0+$/, "");
+}
+
+function setBadgeState(element, text, tone = "") {
+  if (!element) return;
+  element.textContent = text;
+  element.classList.remove("is-ok", "is-warn", "is-muted");
+  if (tone) element.classList.add(tone);
+}
+
+function renderBentoQuickCard() {
+  if (!bentoQuickBody) return;
+  const allEntries = flattenCatalogItems();
+  const byName = new Map();
+  allEntries.forEach((entry) => {
+    if (!byName.has(entry.item.name)) byName.set(entry.item.name, entry);
+  });
+
+  const picked = [];
+  const seen = new Set();
+  const addByName = (name) => {
+    if (!name || seen.has(name) || picked.length >= 6) return;
+    const entry = byName.get(name);
+    if (!entry) return;
+    seen.add(name);
+    picked.push(entry);
+  };
+
+  const pinnedEntries = getValidPinnedEntries();
+  pinnedEntries.forEach((entry) => addByName(entry.item.name));
+
+  Object.entries(state.localClicks)
+    .sort((left, right) => Number(right[1]) - Number(left[1]))
+    .forEach(([name]) => addByName(name));
+
+  (state.homeSummary?.popularNames || []).forEach((name) => addByName(name));
+  allEntries.forEach((entry) => addByName(entry.item.name));
+
+  if (pinnedEntries.length > 0) {
+    setBadgeState(bentoQuickBadge, `已固定 ${pinnedEntries.length} 项`, "is-ok");
+  } else {
+    setBadgeState(bentoQuickBadge, "常点推荐", "is-muted");
+  }
+
+  if (picked.length === 0) {
+    bentoQuickBody.innerHTML = `<p class="bento-placeholder">悬停卡片右上角图钉可固定常用入口</p>`;
+    return;
+  }
+
+  bentoQuickBody.innerHTML = picked.map(({ item }) => {
+    const isExternal = ["h5", "website", "tool"].includes(item.type);
+    const target = isExternal ? 'target="_blank" rel="noopener noreferrer"' : "";
+    const iconName = getIcon(item.name, item.icon);
+    const isImageIcon = iconName && (iconName.includes("/") || iconName.includes("."));
+    const iconHtml = isImageIcon
+      ? `<img src="${escapeAttribute(safeUrl(iconName))}" alt="">`
+      : `<i data-lucide="${escapeAttribute(iconName)}"></i>`;
+    return `
+      <a class="bento-quick-tile" href="${escapeAttribute(safeUrl(item.url))}" ${target} data-track-name="${escapeAttribute(item.name)}" title="${escapeAttribute(item.description || item.name)}">
+        <span class="bento-quick-tile-icon">${iconHtml}</span>
+        <span class="bento-quick-tile-name">${escapeHtml(item.name)}</span>
+      </a>
+    `;
+  }).join("");
+
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function renderHomeBento() {
+  const config = window.IntelligenceHubConfig || {};
+  const enabled = config.homeSummaryEnabled !== false;
+  if (homeBentoGrid) homeBentoGrid.hidden = !enabled;
+  if (!enabled) return;
+
+  if (bentoMeetingCard) bentoMeetingCard.hidden = config.homeMeetingCardEnabled === false;
+  if (bentoExpenseCard) bentoExpenseCard.hidden = config.homeExpenseCardEnabled === false;
+
+  const summary = state.homeSummary;
+  const meetingData = summary?.meetings;
+  if (bentoMeetingBody && config.homeMeetingCardEnabled !== false) {
+    if (!summary) {
+      setBadgeState(bentoMeetingBadge, "加载中", "is-muted");
+      bentoMeetingBody.innerHTML = `<p class="bento-placeholder">正在同步今天的会议安排…</p>`;
+    } else if (meetingData?.status === "ok") {
+      if (meetingData.nextMeeting) {
+        const nextItem = meetingData.nextMeeting;
+        const timeText = nextItem.start && nextItem.end ? `${nextItem.start}-${nextItem.end}` : nextItem.start || "今天";
+        setBadgeState(bentoMeetingBadge, `${meetingData.upcomingCount} 场待开`, "is-ok");
+        const moreCount = Math.max(0, Number(meetingData.upcomingCount || 0) - 1);
+        bentoMeetingBody.innerHTML = `
+          <p class="bento-primary-line" title="${escapeAttribute(nextItem.title)}">${escapeHtml(timeText)} · ${escapeHtml(nextItem.title)}</p>
+          <p class="bento-sub-line">
+            ${nextItem.roomName ? `<span class="bento-sub-tag">${escapeHtml(nextItem.roomName)}</span>` : ""}
+            <span>${moreCount > 0 ? `今日后续还有 ${moreCount} 场` : `今日共 ${meetingData.totalCount} 场会议`}</span>
+          </p>
+        `;
+      } else if (Number(meetingData.totalCount || 0) > 0) {
+        setBadgeState(bentoMeetingBadge, "已结束", "is-muted");
+        bentoMeetingBody.innerHTML = `
+          <p class="bento-primary-line">今日 ${meetingData.totalCount} 场会议已全部结束</p>
+          <p class="bento-sub-line">可随时查询空闲会议室或预约后续会议</p>
+        `;
+      } else {
+        setBadgeState(bentoMeetingBadge, "今日空闲", "is-ok");
+        bentoMeetingBody.innerHTML = `
+          <p class="bento-primary-line">今天暂无会议安排</p>
+          <p class="bento-sub-line">需要开会时可直接点击下方快速约会</p>
+        `;
+      }
+    } else {
+      setBadgeState(bentoMeetingBadge, "快捷入口", "is-muted");
+      bentoMeetingBody.innerHTML = `
+        <p class="bento-primary-line">随时查询日程与空闲会议室</p>
+        <p class="bento-sub-line">支持按日期、会议室或参会人员查询</p>
+      `;
+    }
+  }
+
+  const expenseData = summary?.expense;
+  if (bentoExpenseBody && config.homeExpenseCardEnabled !== false) {
+    if (!summary) {
+      setBadgeState(bentoExpenseBadge, "加载中", "is-muted");
+      bentoExpenseBody.innerHTML = `<p class="bento-placeholder">正在查询当月报销状态…</p>`;
+    } else if (expenseData?.status === "ok") {
+      const periodLabel = formatBillingPeriodLabel(expenseData.currentPeriod) || "本月";
+      if (expenseData.currentPeriodSubmitted && expenseData.currentPeriodRecord) {
+        const currentRec = expenseData.currentPeriodRecord;
+        setBadgeState(bentoExpenseBadge, "本月已提", "is-ok");
+        bentoExpenseBody.innerHTML = `
+          <p class="bento-primary-line">${escapeHtml(periodLabel)} · 实报 ¥${escapeHtml(formatCurrencyValue(currentRec.reimbursedAmount))}</p>
+          <p class="bento-sub-line">
+            <span class="bento-sub-tag">发票 ¥${escapeHtml(formatCurrencyValue(currentRec.invoiceAmount))}</span>
+            <span>已入报销池（${currentRec.invoiceCount || 1} 张）</span>
+          </p>
+        `;
+      } else if (expenseData.latestRecord) {
+        const latestRec = expenseData.latestRecord;
+        const latestPeriod = formatBillingPeriodLabel(latestRec.period);
+        setBadgeState(bentoExpenseBadge, "本月待提", "is-warn");
+        bentoExpenseBody.innerHTML = `
+          <p class="bento-primary-line">${escapeHtml(periodLabel)}暂未提交通讯费</p>
+          <p class="bento-sub-line">最近已报：${escapeHtml(latestPeriod)} · 实报 ¥${escapeHtml(formatCurrencyValue(latestRec.reimbursedAmount))}</p>
+        `;
+      } else {
+        setBadgeState(bentoExpenseBadge, "暂无记录", "is-muted");
+        bentoExpenseBody.innerHTML = `
+          <p class="bento-primary-line">近一年暂无通讯费报销记录</p>
+          <p class="bento-sub-line">支持 PDF 或图片一键校验并入报销池</p>
+        `;
+      }
+    } else {
+      setBadgeState(bentoExpenseBadge, "一键校验", "is-muted");
+      bentoExpenseBody.innerHTML = `
+        <p class="bento-primary-line">通讯费发票自动识别校验</p>
+        <p class="bento-sub-line">支持批量上传 PDF/图片并确认入池</p>
+      `;
+    }
+  }
+
+  renderBentoQuickCard();
+}
+
+async function loadHomeSummary({ forceRefresh = false } = {}) {
+  const config = window.IntelligenceHubConfig || {};
+  if (config.homeSummaryEnabled === false) {
+    if (homeBentoGrid) homeBentoGrid.hidden = true;
+    return;
+  }
+  if (summaryRefreshBtn) summaryRefreshBtn.classList.add("is-loading");
+  try {
+    const url = forceRefresh ? "/api/home-summary?refresh=1" : "/api/home-summary";
+    const response = await fetch(url, { cache: "no-store" });
+    if (response.ok) {
+      const data = await response.json();
+      state.homeSummary = data;
+      if (data.displayName) {
+        state.displayName = data.displayName;
+        renderWorkspaceHeader();
+      }
+      renderHomeBento();
+    } else if (!state.homeSummary) {
+      state.homeSummary = { meetings: { status: "unavailable" }, expense: { status: "unavailable" }, popularNames: [] };
+      renderHomeBento();
+    }
+  } catch {
+    if (!state.homeSummary) {
+      state.homeSummary = { meetings: { status: "unavailable" }, expense: { status: "unavailable" }, popularNames: [] };
+      renderHomeBento();
+    }
+  } finally {
+    if (summaryRefreshBtn) summaryRefreshBtn.classList.remove("is-loading");
+  }
+}
+
+function findCatalogMatches(rawQuery) {
+  const normalized = String(rawQuery || "").trim().toLowerCase();
+  if (!normalized || normalized.length > 40) return [];
+  const aliasTerms = SEARCH_ALIAS_KEYWORDS[normalized] || [];
+  const matches = [];
+
+  flattenCatalogItems().forEach((entry) => {
+    const item = entry.item;
+    const nameLower = String(item.name || "").toLowerCase();
+    const descLower = String(item.description || "").toLowerCase();
+    const sectionLower = String(entry.sectionTitle || "").toLowerCase();
+    const tagsLower = Array.isArray(item.tags) ? item.tags.join(" ").toLowerCase() : "";
+    const combined = `${nameLower} ${descLower} ${sectionLower} ${tagsLower}`;
+
+    let score = 0;
+    if (nameLower === normalized) score = 120;
+    else if (nameLower.startsWith(normalized)) score = 95;
+    else if (nameLower.includes(normalized)) score = 80;
+    else if (tagsLower.includes(normalized)) score = 60;
+    else if (descLower.includes(normalized) || sectionLower.includes(normalized)) score = 40;
+    else if (aliasTerms.some((term) => combined.includes(term))) score = 70;
+
+    if (score > 0) {
+      score += Math.min(15, Number(state.localClicks[item.name] || 0));
+      if (state.pinnedNames.includes(item.name)) score += 10;
+      matches.push({ ...entry, score });
+    }
+  });
+
+  return matches.sort((left, right) => right.score - left.score).slice(0, 6);
+}
+
+function hideCommandMatches() {
+  state.commandMatches = [];
+  state.activeCommandIndex = -1;
+  if (commandMatchPanel) {
+    commandMatchPanel.hidden = true;
+    commandMatchPanel.innerHTML = "";
+  }
+}
+
+function renderCommandMatches(rawQuery) {
+  if (!commandMatchPanel) return;
+  if (assistantPanel?.classList.contains("is-expanded") || assistantPanel?.classList.contains("is-floating")) {
+    hideCommandMatches();
+    return;
+  }
+  const matches = findCatalogMatches(rawQuery);
+  state.commandMatches = matches;
+  state.activeCommandIndex = -1;
+
+  if (matches.length === 0) {
+    hideCommandMatches();
+    return;
+  }
+
+  commandMatchPanel.innerHTML = `
+    <div class="command-match-list">
+      ${matches.map((entry, index) => {
+        const item = entry.item;
+        const isExternal = ["h5", "website", "tool"].includes(item.type);
+        const target = isExternal ? 'target="_blank" rel="noopener noreferrer"' : "";
+        const iconName = getIcon(item.name, item.icon);
+        const isImageIcon = iconName && (iconName.includes("/") || iconName.includes("."));
+        const iconHtml = isImageIcon
+          ? `<img src="${escapeAttribute(safeUrl(iconName))}" alt="">`
+          : `<i data-lucide="${escapeAttribute(iconName)}"></i>`;
+        return `
+          <a class="command-match-item ${index === state.activeCommandIndex ? "is-active" : ""}" data-command-index="${index}" data-track-name="${escapeAttribute(item.name)}" href="${escapeAttribute(safeUrl(item.url))}" ${target}>
+            <span class="command-match-icon">${iconHtml}</span>
+            <span class="command-match-main">
+              <div class="command-match-title">${escapeHtml(item.name)}</div>
+              ${item.description ? `<div class="command-match-desc">${escapeHtml(item.description)}</div>` : ""}
+            </span>
+            <span class="command-match-section">${escapeHtml(entry.sectionTitle)}</span>
+          </a>
+        `;
+      }).join("")}
+    </div>
+    <div class="command-match-foot">
+      <span>找到 ${matches.length} 个匹配入口</span>
+      <span>↑↓ 选择直达 · 回车问助手</span>
+    </div>
+  `;
+  commandMatchPanel.hidden = false;
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function updateActiveCommandHighlight() {
+  if (!commandMatchPanel) return;
+  commandMatchPanel.querySelectorAll(".command-match-item").forEach((element, index) => {
+    element.classList.toggle("is-active", index === state.activeCommandIndex);
+  });
+}
+
+function focusCommandInput(prefillText = "") {
+  if (assistantPanel?.classList.contains("is-floating")) {
+    dockAssistantInline(false);
+  }
+  const inputEl = document.getElementById("assistantInput");
+  if (!inputEl) return;
+  if (prefillText) {
+    inputEl.value = prefillText;
+    inputEl.style.height = "auto";
+    inputEl.style.height = `${inputEl.scrollHeight}px`;
+  }
+  assistantHome?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  inputEl.focus();
+  inputEl.setSelectionRange(inputEl.value.length, inputEl.value.length);
+}
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) => ({
@@ -115,6 +591,10 @@ function applyBranding() {
     const homeAssistantName = c.assistantName.replace(/助手$/, "");
     setText(".assistant-home-heading h2", `今天想让${homeAssistantName}帮你做什么？`);
     setText(".assistant-message-system .assistant-message-content", `你好！我是${c.assistantName}，有什么我可以帮您的吗？`);
+    const inputEl = document.querySelector("#assistantInput");
+    if (inputEl) {
+      inputEl.setAttribute("placeholder", `搜内部系统入口，或问${homeAssistantName}（会议、通讯费报销、公司制度）…`);
+    }
   }
   if (c.poweredBy) setText(".assistant-footer", `POWERED BY ${c.poweredBy}`);
 
@@ -130,6 +610,7 @@ function applyBranding() {
 async function bootstrap() {
   await loadConfigs();
   applyBranding();
+  renderWorkspaceHeader();
   dockAssistantInline(false);
   const response = await fetch("./data/catalog.json", { cache: "no-store" });
   const data = await response.json();
@@ -143,13 +624,18 @@ async function bootstrap() {
     }
   } catch(e) {}
 
+  loadUserWorkbenchPrefs();
+  syncDensityButtons();
   renderNavigation();
+  renderCatalogToolbar();
+  renderHomeBento();
   renderCatalog();
   renderAssistant();
   initAssistantResize();
   initPhotoViewer();
   registerServiceWorker();
   trackEvent("pageview");
+  loadHomeSummary();
 }
 
 async function trackEvent(type, target) {
@@ -220,31 +706,117 @@ async function loadConfigs() {
 
 function renderNavigation() {
   const total = state.catalog.reduce((sum, section) => sum + section.items.length, 0);
-  const navItems = [
-    { id: "all", title: "全部入口", count: total },
-    ...state.catalog.map((section) => ({ id: section.id, title: section.title, count: section.items.length }))
+  const pinnedCount = getValidPinnedEntries().length;
+  const topNavItems = [
+    { id: "all", title: "全部入口", icon: "layout-grid", count: total },
+    { id: "pinned", title: "我的固定", icon: "pin", count: pinnedCount }
   ];
+  const sectionItems = state.catalog.map((section) => ({
+    id: section.id,
+    title: section.title,
+    icon: "folder",
+    count: section.items.length
+  }));
 
-  sectionNav.innerHTML = navItems.map((item) => `
-    <button class="nav-button ${item.id === state.activeSection ? "active" : ""}" data-section="${escapeAttribute(item.id)}">
-      <span>${escapeHtml(item.title)}</span>
+  const renderNavBtn = (item) => `
+    <button class="nav-button ${item.id === state.activeSection ? "active" : ""}" data-section="${escapeAttribute(item.id)}" type="button">
+      <span class="nav-button-label">
+        <i data-lucide="${escapeAttribute(item.icon)}"></i>
+        <span>${escapeHtml(item.title)}</span>
+      </span>
       <span class="nav-count">${item.count}</span>
     </button>
-  `).join("");
+  `;
+
+  sectionNav.innerHTML = `
+    ${topNavItems.map(renderNavBtn).join("")}
+    <div class="nav-group-label">分类目录</div>
+    ${sectionItems.map(renderNavBtn).join("")}
+  `;
 
   sectionNav.querySelectorAll("button").forEach((button) => {
     button.addEventListener("click", () => {
-      state.activeSection = button.dataset.section;
-      renderNavigation();
-      renderCatalog();
+      selectCatalogSection(button.dataset.section);
+    });
+  });
+
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function selectCatalogSection(sectionId) {
+  state.activeSection = sectionId || "all";
+  renderNavigation();
+  renderCatalogToolbar();
+  renderCatalog();
+}
+
+function renderCatalogToolbar() {
+  if (!catalogTabs) return;
+  const total = state.catalog.reduce((sum, section) => sum + section.items.length, 0);
+  const pinnedCount = getValidPinnedEntries().length;
+  const tabs = [
+    { id: "all", title: "全部", count: total },
+    ...(pinnedCount > 0 || state.activeSection === "pinned"
+      ? [{ id: "pinned", title: "我的固定", count: pinnedCount }]
+      : []),
+    ...state.catalog.map((section) => ({
+      id: section.id,
+      title: section.title,
+      count: section.items.length
+    }))
+  ];
+
+  catalogTabs.innerHTML = tabs.map((tab) => `
+    <button class="catalog-tab ${tab.id === state.activeSection ? "active" : ""}" type="button" role="tab" aria-selected="${tab.id === state.activeSection ? "true" : "false"}" data-section="${escapeAttribute(tab.id)}">
+      <span>${escapeHtml(tab.title)}</span>
+      <span class="catalog-tab-count">${tab.count}</span>
+    </button>
+  `).join("");
+
+  catalogTabs.querySelectorAll(".catalog-tab").forEach((button) => {
+    button.addEventListener("click", () => {
+      selectCatalogSection(button.dataset.section);
     });
   });
 }
 
+function syncDensityButtons() {
+  document.querySelectorAll(".density-btn").forEach((button) => {
+    button.classList.toggle("active", button.dataset.density === state.density);
+  });
+  catalogArea?.classList.toggle("is-comfortable", state.density === "comfortable");
+}
+
 function renderCatalog() {
+  catalogArea.classList.toggle("is-comfortable", state.density === "comfortable");
+
+  if (state.activeSection === "pinned") {
+    const pinnedEntries = getValidPinnedEntries();
+    if (pinnedEntries.length === 0) {
+      catalogArea.innerHTML = `<div class="empty-state">还没有固定的入口。将鼠标移到任意卡片右上角，点击图钉图标即可加入「我的固定」。</div>`;
+      return;
+    }
+    catalogArea.innerHTML = `
+      <section class="catalog-section" id="section-pinned">
+        <div class="section-heading">
+          <div>
+            <h2>我的固定</h2>
+            <p>你手动置顶的高频入口，也会同步显示在上方「我的常用」卡片中。</p>
+          </div>
+          <span class="status-text">${pinnedEntries.length} 项</span>
+        </div>
+        <div class="item-grid">
+          ${pinnedEntries.map((entry) => renderCard(entry.item, entry.toneClass)).join("")}
+        </div>
+      </section>
+    `;
+    if (window.lucide) window.lucide.createIcons();
+    return;
+  }
+
   const filteredSections = state.catalog
+    .map((section, index) => ({ ...section, toneClass: `tone-${index % 5}` }))
     .filter((section) => state.activeSection === "all" || section.id === state.activeSection)
-    .map((section) => ({ ...section, items: section.items }))
     .filter((section) => section.items.length > 0);
 
   if (filteredSections.length === 0) {
@@ -262,7 +834,7 @@ function renderCatalog() {
         <span class="status-text">${section.items.length} 项</span>
       </div>
       <div class="item-grid">
-        ${section.items.map(renderCard).join("")}
+        ${section.items.map((item) => renderCard(item, section.toneClass)).join("")}
       </div>
     </section>
   `).join("");
@@ -274,10 +846,11 @@ function renderCatalog() {
 }
 
 
-function renderCard(item) {
+function renderCard(item, toneClass = "tone-0") {
   const isExternal = ["h5", "website", "tool"].includes(item.type);
   const target = isExternal ? 'target="_blank" rel="noopener noreferrer"' : "";
   const iconName = getIcon(item.name, item.icon);
+  const isPinned = state.pinnedNames.includes(item.name);
   
   // 判断是 Lucide 图标还是图片路径
   const isImageIcon = iconName && (iconName.includes("/") || iconName.includes("."));
@@ -288,13 +861,16 @@ function renderCard(item) {
   const itemDescription = escapeHtml(item.description);
   const actionsHtml = renderActions(item);
   const detailHtml = item.description
-    ? `<p>${itemDescription}</p>`
+    ? `<p title="${escapeAttribute(item.description)}">${itemDescription}</p>${actionsHtml}`
     : actionsHtml;
   const itemUrl = escapeAttribute(safeUrl(item.url));
 
   return `
-    <article class="hub-resource-card">
-      <a class="resource-card-link" href="${itemUrl}" ${target} data-track-name="${escapeAttribute(item.name)}" aria-label="${escapeAttribute(item.name)}"></a>
+    <article class="hub-resource-card ${escapeAttribute(toneClass)}">
+      <a class="resource-card-link" href="${itemUrl}" ${target} data-track-name="${escapeAttribute(item.name)}" aria-label="${escapeAttribute(item.name)}" title="${escapeAttribute(item.description || item.name)}"></a>
+      <button class="card-pin-btn ${isPinned ? "is-pinned" : ""}" type="button" data-pin-name="${escapeAttribute(item.name)}" aria-label="${isPinned ? "取消固定" : "固定到我的常用"}" title="${isPinned ? "取消固定" : "固定到我的常用"}">
+        <i data-lucide="pin"></i>
+      </button>
       <div class="card-icon">
         ${iconHtml}
       </div>
@@ -2118,15 +2694,57 @@ function renderAssistant() {
   };
 
   sendBtn.addEventListener("click", sendMessage);
+  dispatchAssistantPrompt = (text, { send = true } = {}) => {
+    hideCommandMatches();
+    if (send) {
+      sendMessage({ queryText: text, displayText: text });
+    } else {
+      focusCommandInput(text);
+    }
+  };
   inputEl.addEventListener("keydown", (e) => {
+    if (state.commandMatches.length > 0 && !commandMatchPanel?.hidden) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        state.activeCommandIndex = (state.activeCommandIndex + 1) % state.commandMatches.length;
+        updateActiveCommandHighlight();
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        state.activeCommandIndex = state.activeCommandIndex <= 0
+          ? state.commandMatches.length - 1
+          : state.activeCommandIndex - 1;
+        updateActiveCommandHighlight();
+        return;
+      }
+      if (e.key === "Enter" && !e.shiftKey && state.activeCommandIndex >= 0) {
+        e.preventDefault();
+        const activeLink = commandMatchPanel.querySelector(`.command-match-item[data-command-index="${state.activeCommandIndex}"]`);
+        if (activeLink) {
+          activeLink.click();
+          inputEl.value = "";
+          inputEl.style.height = "auto";
+          hideCommandMatches();
+        }
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        hideCommandMatches();
+        return;
+      }
+    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
+      hideCommandMatches();
       sendMessage();
     }
   });
   inputEl.addEventListener("input", function() {
     this.style.height = "auto";
     this.style.height = (this.scrollHeight) + "px";
+    renderCommandMatches(this.value);
   });
 }
 
@@ -2134,6 +2752,7 @@ function setAssistantExpanded(isExpanded) {
   if (!assistantPanel || assistantPanel.classList.contains("is-floating")) return;
   assistantPanel.classList.toggle("is-expanded", isExpanded);
   assistantHome?.classList.toggle("has-conversation", isExpanded);
+  if (isExpanded) hideCommandMatches();
   assistantToggle?.parentElement?.classList.toggle("inline-panel-expanded", isExpanded);
   if (assistantClose) {
     assistantClose.setAttribute("aria-label", "收起首页对话");
@@ -2336,15 +2955,92 @@ assistantClose.addEventListener("click", () => {
 });
 
 catalogArea.addEventListener("click", (event) => {
+  const pinBtn = event.target.closest("[data-pin-name]");
+  if (pinBtn) {
+    event.preventDefault();
+    event.stopPropagation();
+    togglePinEntry(pinBtn.dataset.pinName);
+    return;
+  }
   const link = event.target.closest("[data-track-name]");
   if (!link) return;
   trackEvent("click", link.dataset.trackName);
+  recordLocalClick(link.dataset.trackName);
 });
+
+homeBentoGrid?.addEventListener("click", (event) => {
+  const link = event.target.closest("[data-track-name]");
+  if (!link) return;
+  trackEvent("click", link.dataset.trackName);
+  recordLocalClick(link.dataset.trackName);
+});
+
+commandMatchPanel?.addEventListener("click", (event) => {
+  const link = event.target.closest("[data-track-name]");
+  if (!link) return;
+  trackEvent("click", link.dataset.trackName);
+  recordLocalClick(link.dataset.trackName);
+  const inputEl = document.getElementById("assistantInput");
+  if (inputEl) {
+    inputEl.value = "";
+    inputEl.style.height = "auto";
+  }
+  hideCommandMatches();
+});
+
+document.addEventListener("click", (event) => {
+  const promptTrigger = event.target.closest("[data-quick-prompt]");
+  if (promptTrigger) {
+    dispatchAssistantPrompt?.(promptTrigger.dataset.quickPrompt, { send: true });
+    return;
+  }
+  const prefillTrigger = event.target.closest("[data-quick-prefill]");
+  if (prefillTrigger) {
+    dispatchAssistantPrompt?.(prefillTrigger.dataset.quickPrefill, { send: false });
+    return;
+  }
+  const actionTrigger = event.target.closest("[data-quick-action]");
+  if (actionTrigger?.dataset.quickAction === "upload-invoice") {
+    document.querySelector("#nativeUploadBtn")?.click();
+    return;
+  }
+  const densityBtn = event.target.closest(".density-btn");
+  if (densityBtn && densityBtn.dataset.density) {
+    state.density = densityBtn.dataset.density === "comfortable" ? "comfortable" : "compact";
+    saveDensityPref();
+    syncDensityButtons();
+    return;
+  }
+  if (commandMatchPanel && !commandMatchPanel.hidden && !event.target.closest("#assistantHome")) {
+    hideCommandMatches();
+  }
+});
+
+commandFocusBtn?.addEventListener("click", () => focusCommandInput());
+summaryRefreshBtn?.addEventListener("click", () => loadHomeSummary({ forceRefresh: true }));
 
 adminEntry.addEventListener("click", tryOpenAdmin);
 
 document.addEventListener("keydown", (event) => {
+  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+    event.preventDefault();
+    focusCommandInput();
+    return;
+  }
+  if (event.key === "/" && !event.metaKey && !event.ctrlKey && !event.altKey) {
+    const activeTag = document.activeElement?.tagName;
+    const isEditable = activeTag === "INPUT" || activeTag === "TEXTAREA" || document.activeElement?.isContentEditable;
+    if (!isEditable) {
+      event.preventDefault();
+      focusCommandInput();
+      return;
+    }
+  }
   if (event.key === "Escape") {
+    if (commandMatchPanel && !commandMatchPanel.hidden) {
+      hideCommandMatches();
+      return;
+    }
     const historyLayer = document.getElementById("assistantHistoryLayer");
     if (historyLayer?.classList.contains("open")) {
       document.getElementById("assistantHistoryClose")?.click();
@@ -2490,6 +3186,7 @@ if (nativeUploadBtn && nativeInvoiceUpload) {
             await Promise.all(confirmPromises);
             showToast(`✅ 已成功提交 ${compliantInvoices.length} 张发票进入报销池`);
             modal.setAttribute('aria-hidden', 'true');
+            loadHomeSummary({ forceRefresh: true });
           } catch(e) {
             showToast("❌ 网络异常，部分发票提交失败", true);
             btn.disabled = false;

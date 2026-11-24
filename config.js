@@ -17,5 +17,10 @@ window.IntelligenceHubConfig = {
 
   // 侧边栏每日图片默认关闭
   dailyPhotoEnabled: false,
-  dailyPhotoUrl: ""
+  dailyPhotoUrl: "",
+
+  // 首页工作台 Bento 轻状态区
+  homeSummaryEnabled: true,
+  homeMeetingCardEnabled: true,
+  homeExpenseCardEnabled: true
 };

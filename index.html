@@ -13,11 +13,11 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./assets/icons/icon-192.png" type="image/png" />
     <link rel="apple-touch-icon" href="./assets/icons/apple-touch-icon.png" />
-    <link rel="stylesheet" href="./styles.css?v=20261124_02" />
+    <link rel="stylesheet" href="./styles.css?v=20261124_03" />
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://unpkg.com/marked@12.0.0/marked.min.js"></script>
     <script src="https://unpkg.com/dompurify@3.0.9/dist/purify.min.js"></script>
-    <script type="module" src="./app.js?v=20261124_02"></script>
+    <script type="module" src="./app.js?v=20261124_03"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -42,14 +42,105 @@
       </aside>
 
       <main class="workspace">
-        <section class="assistant-home" id="assistantHome" aria-label="犇犇助手对话区">
-          <div class="assistant-home-heading">
-            <h2>今天想让犇犇帮你做什么？</h2>
-          </div>
-          <div class="assistant-inline-mount" id="assistantInlineMount"></div>
-        </section>
+        <div class="workspace-inner">
+          <header class="workspace-topbar">
+            <div class="workspace-greeting-group">
+              <h1 class="workspace-greeting" id="workspaceGreeting">欢迎回来</h1>
+              <span class="workspace-date" id="workspaceDate"></span>
+            </div>
+            <div class="workspace-topbar-actions">
+              <button class="topbar-kbd-btn" id="commandFocusBtn" type="button" title="搜索系统入口或向助手提问">
+                <i data-lucide="search"></i>
+                <span>搜入口 / 问助手</span>
+                <kbd id="commandShortcutHint">⌘K</kbd>
+              </button>
+              <button class="topbar-icon-btn" id="summaryRefreshBtn" type="button" aria-label="刷新工作台状态" title="刷新今日日程与报销状态">
+                <i data-lucide="refresh-cw"></i>
+              </button>
+            </div>
+          </header>
 
-        <section class="catalog-area" id="catalogArea" aria-live="polite"></section>
+          <section class="assistant-home" id="assistantHome" aria-label="智能搜索与对话区">
+            <div class="assistant-home-heading">
+              <h2>今天想让助手帮你做什么？</h2>
+            </div>
+            <div class="assistant-inline-mount" id="assistantInlineMount"></div>
+            <div class="command-match-panel" id="commandMatchPanel" hidden aria-live="polite"></div>
+            <div class="assistant-quick-prompts" id="assistantQuickPrompts" aria-label="常用快捷指令">
+              <button class="quick-prompt-chip" type="button" data-quick-prompt="查一下我今天的会议">
+                <i data-lucide="calendar"></i><span>查今日会议</span>
+              </button>
+              <button class="quick-prompt-chip" type="button" data-quick-prompt="今天有哪些空闲会议室">
+                <i data-lucide="door-open"></i><span>查空闲会议室</span>
+              </button>
+              <button class="quick-prompt-chip" type="button" data-quick-prompt="查询我的通讯费报销记录">
+                <i data-lucide="receipt"></i><span>查报销记录</span>
+              </button>
+              <button class="quick-prompt-chip" type="button" data-quick-action="upload-invoice">
+                <i data-lucide="upload"></i><span>上传通讯费发票</span>
+              </button>
+              <button class="quick-prompt-chip" type="button" data-quick-prefill="公司制度里关于">
+                <i data-lucide="book-open"></i><span>问公司制度</span>
+              </button>
+            </div>
+          </section>
+
+          <section class="home-bento" id="homeBentoGrid" aria-label="今日工作台概览">
+            <article class="bento-card bento-card-meeting" id="bentoMeetingCard">
+              <div class="bento-card-head">
+                <span class="bento-card-title"><i data-lucide="calendar-clock"></i>今日日程</span>
+                <span class="bento-badge" id="bentoMeetingBadge">加载中</span>
+              </div>
+              <div class="bento-card-body" id="bentoMeetingBody">
+                <p class="bento-placeholder">正在同步今天的会议安排…</p>
+              </div>
+              <div class="bento-card-actions">
+                <button class="bento-action-btn" type="button" data-quick-prompt="查一下我今天的会议">查看日程</button>
+                <button class="bento-action-btn bento-action-primary" type="button" data-quick-prefill="帮我预定会议：">快速约会</button>
+              </div>
+            </article>
+
+            <article class="bento-card bento-card-expense" id="bentoExpenseCard">
+              <div class="bento-card-head">
+                <span class="bento-card-title"><i data-lucide="receipt-text"></i>通讯费报销</span>
+                <span class="bento-badge" id="bentoExpenseBadge">加载中</span>
+              </div>
+              <div class="bento-card-body" id="bentoExpenseBody">
+                <p class="bento-placeholder">正在查询当月报销状态…</p>
+              </div>
+              <div class="bento-card-actions">
+                <button class="bento-action-btn" type="button" data-quick-prompt="查询我的通讯费报销记录">历史记录</button>
+                <button class="bento-action-btn bento-action-primary" type="button" data-quick-action="upload-invoice">上传发票</button>
+              </div>
+            </article>
+
+            <article class="bento-card bento-card-quick" id="bentoQuickCard">
+              <div class="bento-card-head">
+                <span class="bento-card-title"><i data-lucide="pin"></i>我的常用</span>
+                <span class="bento-badge" id="bentoQuickBadge">自动推荐</span>
+              </div>
+              <div class="bento-quick-grid" id="bentoQuickBody">
+                <p class="bento-placeholder">加载常用入口…</p>
+              </div>
+            </article>
+          </section>
+
+          <div class="catalog-toolbar" id="catalogToolbar">
+            <div class="catalog-tabs" id="catalogTabs" role="tablist" aria-label="入口分类筛选"></div>
+            <div class="catalog-toolbar-right">
+              <div class="density-switch" role="group" aria-label="卡片显示密度">
+                <button class="density-btn active" type="button" data-density="compact" title="紧凑磁贴视图">
+                  <i data-lucide="layout-grid"></i><span>紧凑</span>
+                </button>
+                <button class="density-btn" type="button" data-density="comfortable" title="舒适详情视图">
+                  <i data-lucide="rows-3"></i><span>舒适</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <section class="catalog-area" id="catalogArea" aria-live="polite"></section>
+        </div>
       </main>
     </div>
 
@@ -111,7 +202,7 @@
               <button class="native-upload-btn" id="nativeUploadBtn" type="button" aria-label="通讯费报销">
                 通讯费报销
               </button>
-              <textarea id="assistantInput" placeholder="查询会议、通讯费报销记录，或问问公司制度..." rows="1"></textarea>
+              <textarea id="assistantInput" placeholder="搜内部系统入口，或问助手（会议、通讯费报销、公司制度）…" rows="1"></textarea>
               <input id="difyAttachmentInput" type="file" accept="image/*,application/pdf" multiple style="display:none;" />
               <button id="difyAttachmentBtn" class="assistant-mic-btn" type="button" aria-label="上传发票附件">
                 <i data-lucide="paperclip"></i>

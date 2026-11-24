@@ -162,7 +162,7 @@ app.use(express.json());
 // Cloud Home provider IDs differ from employee UIDs used by business tools
 // and Dify file ownership. Resolve verified headers through the existing
 // invoice directory connection before invoking those tools.
-app.use(["/api/chat", "/api/check-auth", "/api/meeting-intent", "/api/meeting-availability", "/invoice-proxy"], async (req, res, next) => {
+app.use(["/api/chat", "/api/check-auth", "/api/home-summary", "/api/meeting-intent", "/api/meeting-availability", "/invoice-proxy"], async (req, res, next) => {
   const providerUser = req.headers["remote-user"] || "";
   if (!/^[0-9a-f]{24}$/i.test(providerUser)) return next();
   const identityHeaders = { "Remote-User": providerUser };
@@ -196,6 +196,155 @@ app.use(["/api/chat", "/api/check-auth", "/api/meeting-intent", "/api/meeting-av
 
 function assistantUser(req) {
   return req.assistantIdentity?.username || req.headers["remote-user"] || "anonymous";
+}
+
+function getShanghaiNowParts(now = new Date()) {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  const parts = Object.fromEntries(
+    formatter.formatToParts(now).filter((part) => part.type !== "literal").map((part) => [part.type, part.value])
+  );
+  const hour = parts.hour === "24" ? "00" : parts.hour;
+  return {
+    todayIso: `${parts.year}-${parts.month}-${parts.day}`,
+    currentPeriod: `${parts.year}${parts.month}`,
+    nowTime: `${hour}:${parts.minute}`,
+  };
+}
+
+const HOME_SUMMARY_CACHE_TTL_MS = 20000;
+const HOME_SUMMARY_CACHE_MAX = 200;
+const homeSummaryCache = new Map();
+
+function readHomeSummaryCache(cacheKey) {
+  const entry = homeSummaryCache.get(cacheKey);
+  if (!entry) return null;
+  if (Date.now() - entry.at > HOME_SUMMARY_CACHE_TTL_MS) {
+    homeSummaryCache.delete(cacheKey);
+    return null;
+  }
+  return entry.data;
+}
+
+function writeHomeSummaryCache(cacheKey, data) {
+  if (homeSummaryCache.size >= HOME_SUMMARY_CACHE_MAX) {
+    const oldestKey = homeSummaryCache.keys().next().value;
+    if (oldestKey) homeSummaryCache.delete(oldestKey);
+  }
+  homeSummaryCache.set(cacheKey, { at: Date.now(), data });
+}
+
+function readPopularEntryNames(limit = 6) {
+  const stats = readJsonFile(STATS_FILE, DEFAULT_STATS);
+  const clicks = stats?.clicks && typeof stats.clicks === "object" ? stats.clicks : {};
+  return Object.entries(clicks)
+    .filter(([name, count]) => name && Number(count) > 0)
+    .sort((a, b) => Number(b[1]) - Number(a[1]))
+    .slice(0, limit)
+    .map(([name]) => name);
+}
+
+async function fetchTodayMeetingSummary(username, displayName, todayIso, nowTime) {
+  const apiBase = String(process.env.CHENCY_MEET_API_URL || "").replace(/\/$/, "");
+  const apiSecret = process.env.CHENCY_MEET_AI_SECRET || "";
+  if (!apiBase || !apiSecret) return { status: "unconfigured" };
+
+  try {
+    const response = await fetch(`${apiBase}/api/ai/meetings-query`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiSecret}`,
+        "X-Chency-User": username,
+        "X-Chency-Name": encodeURIComponent(displayName || username),
+      },
+      body: JSON.stringify({
+        date: todayIso,
+        queryScope: "mine",
+        requesterUser: username,
+      }),
+      signal: AbortSignal.timeout(3500),
+    });
+    if (!response.ok) return { status: "unavailable" };
+    const data = await response.json();
+    const rawMeetings = Array.isArray(data?.ui?.meetings) ? data.ui.meetings : [];
+    const meetings = rawMeetings
+      .map((meeting) => ({
+        title: truncateText(meeting?.title || "未命名会议", 80),
+        date: truncateText(meeting?.date || todayIso, 10),
+        start: truncateText(meeting?.start || "", 5),
+        end: truncateText(meeting?.end || "", 5),
+        roomName: truncateText(meeting?.roomName || meeting?.room || "", 40),
+      }))
+      .sort((a, b) => a.start.localeCompare(b.start));
+    const upcoming = meetings.filter((meeting) => {
+      const compareTime = meeting.end || meeting.start;
+      return !compareTime || compareTime > nowTime;
+    });
+    return {
+      status: "ok",
+      date: todayIso,
+      totalCount: meetings.length,
+      upcomingCount: upcoming.length,
+      nextMeeting: upcoming[0] || null,
+      meetings: meetings.slice(0, 3),
+    };
+  } catch (error) {
+    console.error("Home summary meetings fetch failed:", error.name || error.message);
+    return { status: "unavailable" };
+  }
+}
+
+async function fetchExpenseSummary(username, currentPeriod) {
+  const host = String(process.env.INVOICE_HOST || "").trim();
+  if (!host) return { status: "unconfigured", currentPeriod };
+  const invoicePort = Number(process.env.INVOICE_PORT) || 8082;
+
+  try {
+    const response = await fetch(`http://${host}:${invoicePort}/api/invoices/dify/history`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: username }),
+      signal: AbortSignal.timeout(3500),
+    });
+    if (!response.ok) return { status: "unavailable", currentPeriod };
+    const data = await response.json();
+    if (data?.status !== "ok" || data?.ui?.schema !== "chency.expense.v1") {
+      return { status: "unavailable", currentPeriod };
+    }
+    const records = Array.isArray(data.ui.records) ? data.ui.records : [];
+    const pickRecord = (record) => (record ? {
+      period: truncateText(record.period || "", 32),
+      invoiceAmount: Number(record.invoiceAmount || 0),
+      reimbursedAmount: Number(record.reimbursedAmount || 0),
+      invoiceCount: Number(record.invoiceCount || 0),
+    } : null);
+    const currentPeriodRecord = records.find((record) => String(record?.period || "").includes(currentPeriod)) || null;
+    const latestRecord = records[0] || null;
+    const summary = data.ui.summary || {};
+    return {
+      status: "ok",
+      currentPeriod,
+      currentPeriodSubmitted: Boolean(currentPeriodRecord),
+      currentPeriodRecord: pickRecord(currentPeriodRecord),
+      latestRecord: pickRecord(latestRecord),
+      yearSummary: {
+        count: Number(summary.count || 0),
+        invoiceAmount: Number(summary.invoiceAmount || 0),
+        reimbursedAmount: Number(summary.reimbursedAmount || 0),
+      },
+    };
+  } catch (error) {
+    console.error("Home summary expense fetch failed:", error.name || error.message);
+    return { status: "unavailable", currentPeriod };
+  }
 }
 
 import http from "http";
@@ -678,6 +827,62 @@ app.get("/api/check-auth", (req, res) => {
   // 如果是 SSO 指定用户，则视为已登录
   const authenticated = remoteUser === ADMIN_REMOTE_USER;
   res.json({ authenticated, user: req.assistantIdentity?.username || remoteUser });
+});
+
+// 首页工作台轻量聚合概览（个人今日日程、当月通讯费报销状态与热门入口）
+app.get("/api/home-summary", async (req, res) => {
+  const username = assistantUser(req);
+  const hasUser = Boolean(username && username !== "anonymous");
+  const displayName = hasUser
+    ? truncateText(
+        req.assistantIdentity?.name
+        || decodeHeaderText(req.headers["remote-name"] || req.headers["x-forwarded-user"])
+        || username,
+        80
+      )
+    : "";
+  const { todayIso, currentPeriod, nowTime } = getShanghaiNowParts();
+  const popularNames = readPopularEntryNames(6);
+
+  if (!hasUser) {
+    res.json({
+      user: "",
+      displayName: "",
+      today: todayIso,
+      currentPeriod,
+      popularNames,
+      meetings: { status: "unauthenticated" },
+      expense: { status: "unauthenticated", currentPeriod },
+    });
+    return;
+  }
+
+  const forceRefresh = req.query.refresh === "1";
+  const cacheKey = `${username}:${todayIso}`;
+  if (!forceRefresh) {
+    const cached = readHomeSummaryCache(cacheKey);
+    if (cached) {
+      res.json({ ...cached, popularNames });
+      return;
+    }
+  }
+
+  const [meetingsResult, expenseResult] = await Promise.allSettled([
+    fetchTodayMeetingSummary(username, displayName, todayIso, nowTime),
+    fetchExpenseSummary(username, currentPeriod),
+  ]);
+
+  const payload = {
+    user: username,
+    displayName,
+    today: todayIso,
+    currentPeriod,
+    popularNames,
+    meetings: meetingsResult.status === "fulfilled" ? meetingsResult.value : { status: "unavailable" },
+    expense: expenseResult.status === "fulfilled" ? expenseResult.value : { status: "unavailable", currentPeriod },
+  };
+  writeHomeSummaryCache(cacheKey, payload);
+  res.json(payload);
 });
 
 // 统计接口 (公开)
