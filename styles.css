@@ -36,14 +36,12 @@ input {
 }
 
 .site-bar {
-  background: var(--surface);
-  border-bottom: 1px solid var(--line);
   padding: 0 30px;
 }
 
 .site-bar-inner {
   max-width: 1280px;
-  min-height: 68px;
+  min-height: 56px;
   margin: auto;
   display: flex;
   align-items: center;
@@ -52,30 +50,34 @@ input {
 }
 
 .brand-block {
+  flex: 1;
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 9px;
+}
+
+.brand-block::after {
+  content: "";
+  flex: 1;
+  margin-inline-start: 8px;
+  border-top: 1px solid var(--line);
 }
 
 .brand-mark {
   width: 42px;
   height: 42px;
   flex-shrink: 0;
-  border: 1px solid rgba(255, 255, 255, 0.72);
-  background: #e8edf4;
-  border-radius: 8px;
   display: grid;
   place-items: center;
   overflow: hidden;
-  padding: 3px;
 }
 
 .brand-mark img {
   width: 100%;
   height: 100%;
   display: block;
-  border-radius: 4px;
-  object-fit: cover;
+  object-fit: contain;
+  transform: scale(1.52);
 }
 
 .brand-name {
@@ -112,7 +114,7 @@ input {
 }
 
 .workspace {
-  padding: 22px 30px 44px;
+  padding: 4px 30px 44px;
   min-width: 0;
 }
 
@@ -2703,6 +2705,7 @@ p {
 }
 
 @media (max-width: 860px) {
+  .site-bar { padding-inline: 18px; }
   .brand-block {
     gap: 10px;
   }
@@ -2710,8 +2713,6 @@ p {
   .brand-mark {
     width: 38px;
     height: 38px;
-    border-radius: 6px;
-    padding: 3px;
   }
 
   .brand-name {
@@ -2725,7 +2726,7 @@ p {
   }
 
   .workspace {
-    padding: 16px 18px 28px;
+    padding: 4px 18px 28px;
   }
 
   .home-bento {
@@ -2767,14 +2768,11 @@ p {
 
 @media (max-width: 520px) {
   .site-bar { padding-inline: 14px; }
-  .site-bar-inner { min-height: 58px; }
+  .site-bar-inner { min-height: 50px; }
+  .brand-block::after { display: none; }
   .workspace-date, #commandShortcutHint { display: none; }
   .workspace {
-    padding: 18px 14px 24px;
-  }
-
-  .assistant-home {
-    margin-top: 14px;
+    padding: 4px 14px 24px;
   }
 
   .assistant-inline-mount .assistant-panel.is-expanded {
