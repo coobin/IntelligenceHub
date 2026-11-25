@@ -65,7 +65,7 @@ function listText(tool, result) {
 }
 
 async function askModel(messages, tools) {
-  if (!process.env.PORTAL_MODEL_KEY) throw failure(503, "测试版尚未配置模型凭证。");
+  if (!process.env.PORTAL_MODEL_KEY) throw failure(503, "新版助手的自由问答尚未启用。你可以使用下方的会议和报销快捷查询，或输入制度名称检索原文。");
   const response = await fetch(`${process.env.PORTAL_MODEL_BASE.replace(/\/$/, "")}/chat/completions`, {
     method: "POST", redirect: "error", signal: AbortSignal.timeout(60000),
     headers: { Authorization: `Bearer ${process.env.PORTAL_MODEL_KEY}`, "Content-Type": "application/json" },
@@ -172,7 +172,9 @@ export function installPortalAssistant(app, { assistantUser, audioUpload }) {
           return res.json({ text: result.summary, status: result.status });
         } catch { throw failure(502, "暂时无法核实操作结果，请先核对本人会议记录。"); }
       }
-      const fixed = stockQueries.get(query);
+      const normalized = query.trim().replace(/[？?。！!]+$/u, "").trim();
+      const todayRoomOverview = /^(?:请问|帮我查一下|查一下|看看)?(?:今天(?:的)?会议室|会议室今天(?:的)?)(?:的)?(?:空闲情况|使用情况|情况|空闲时段)(?:是啥|是什么|怎么样|如何|咋样|呢)?$/u.test(normalized);
+      const fixed = todayRoomOverview ? "meet_check_availability" : stockQueries.get(normalized);
       if (fixed) {
         const args = fixed === "meet_list_meetings" ? { date: today(), mine: true } :
           fixed === "meet_check_availability" ? { date: today() } : {};

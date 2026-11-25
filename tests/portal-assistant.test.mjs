@@ -19,6 +19,11 @@ test("portal scopes confirmation to employee and conversation and consumes it on
       name, inputSchema: { type: "object" },
     })) };
     if (method === "tools/call") {
+      if (params.name === "meet_check_availability") {
+        assert.deepEqual(params.arguments, { date: new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai" }).format(new Date()) });
+        return res.json({ id, jsonrpc: "2.0", result: { structuredContent: { status: "succeeded",
+          summary: "已查询会议室空闲时段", data: { rooms: [] } } } });
+      }
       if (params.name === "policy_search") {
         assert.equal(params.arguments.query, "差旅制度");
         return res.json({ id, jsonrpc: "2.0", result: { structuredContent: { status: "succeeded",
@@ -50,9 +55,9 @@ test("portal scopes confirmation to employee and conversation and consumes it on
   app.use(express.json());
   installPortalAssistant(app, { assistantUser: req => req.headers["remote-user"], audioUpload: multer(), root: "." });
   const base = await listen(app);
-  const chat = (user, session, confirm) => fetch(base + "/api/new/chat", { method: "POST",
+  const chat = (user, session, confirm, query = confirm ? "确认" : "预约会议") => fetch(base + "/api/new/chat", { method: "POST",
     headers: { "Content-Type": "application/json", "Remote-User": user, Origin: process.env.PORTAL_ORIGIN, Cookie: "irrelevant=private; authelia_session=test" },
-    body: JSON.stringify({ query: confirm ? "确认" : "预约会议", session, confirm }) });
+    body: JSON.stringify({ query, session, confirm }) });
   const preview = await (await chat("first", "one")).json();
   assert.ok(preview.confirm);
   assert.equal(writes, 0);
@@ -62,6 +67,8 @@ test("portal scopes confirmation to employee and conversation and consumes it on
   assert.equal((await chat("first", "one", preview.confirm)).status, 409);
   assert.equal(writes, 1);
   delete process.env.PORTAL_MODEL_KEY;
+  const rooms = await chat("first", "rooms", undefined, "今天的会议室情况是啥？");
+  assert.equal((await rooms.json()).text, "已查询会议室空闲时段");
   const policy = await fetch(base + "/api/new/chat", { method: "POST",
     headers: { "Content-Type": "application/json", "Remote-User": "first", Origin: process.env.PORTAL_ORIGIN, Cookie: "authelia_session=test" },
     body: JSON.stringify({ query: "差旅制度", session: "policy" }) });
