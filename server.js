@@ -59,14 +59,6 @@ const upload = multer({
   }
 });
 
-const chatUpload = multer({
-  storage,
-  limits: {
-    fileSize: 15 * 1024 * 1024, // Dify API allows up to 15MB
-    files: 1
-  }
-});
-
 // 语音转文字：用内存存储，音频不落盘（小文件、用完即弃，避免落到公开目录）
 const audioUpload = multer({
   storage: multer.memoryStorage(),
@@ -163,7 +155,7 @@ app.use(express.json());
 // Cloud Home provider IDs differ from employee UIDs used by business tools
 // and Dify file ownership. Resolve verified headers through the existing
 // invoice directory connection before invoking those tools.
-app.use(["/api/new", "/api/chat", "/api/check-auth", "/api/home-summary", "/api/meeting-intent", "/api/meeting-availability", "/invoice-proxy"], async (req, res, next) => {
+app.use(["/api/new", "/api/check-auth", "/api/home-summary", "/api/meeting-availability", "/invoice-proxy"], async (req, res, next) => {
   const providerUser = req.headers["remote-user"] || "";
   if (!/^[0-9a-f]{24}$/i.test(providerUser)) return next();
   const identityHeaders = { "Remote-User": providerUser };
@@ -215,9 +207,8 @@ installPortalAssistant(app, {
   authenticate: (req, res, next) => authenticate(req, res, next),
   chatLogDir: path.join(__dirname, "data/chat-logs"),
 });
-app.get("/new", (req, res) => {
-  if (req.path.endsWith("/")) return res.redirect(302, "/new");
-  res.set("Cache-Control", "no-store").sendFile(path.join(__dirname, "index.html"));
+app.get(["/new", "/new/"], (req, res) => {
+  res.redirect(302, "/");
 });
 
 function getShanghaiNowParts(now = new Date()) {
@@ -508,52 +499,6 @@ app.use("/invoice-proxy", (req, res) => {
   }
 });
 
-// 对规则无法确定、但疑似会议空间相关的问法做轻量语义分类。
-// 模型只返回固定标签；分类失败时前端会继续走原有 Dify 会话，不影响其他能力。
-app.post("/api/meeting-intent", async (req, res) => {
-  const query = truncateText(req.body?.query, 300);
-  if (!query) {
-    res.status(400).json({ availability: false, classified: false });
-    return;
-  }
-
-  const intentApiUrl = process.env.DIFY_MEETING_INTENT_API_URL || process.env.DIFY_API_URL || "";
-  const intentApiKey = process.env.DIFY_MEETING_INTENT_API_KEY || "";
-  if (!intentApiUrl || !intentApiKey) {
-    res.status(503).json({ availability: false, classified: false });
-    return;
-  }
-
-  try {
-    const response = await fetch(intentApiUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${intentApiKey}`,
-      },
-      body: JSON.stringify({
-        inputs: {},
-        query,
-        response_mode: "blocking",
-        conversation_id: "",
-        user: assistantUser(req),
-        auto_generate_name: false,
-      }),
-      signal: AbortSignal.timeout(6000),
-    });
-    const data = await response.json();
-    const label = String(data?.answer || "").trim().toUpperCase().match(/\b(AVAILABILITY|OTHER)\b/)?.[1] || "";
-    if (!response.ok || !label) {
-      res.status(502).json({ availability: false, classified: false });
-      return;
-    }
-    res.json({ availability: label === "AVAILABILITY", classified: true });
-  } catch (error) {
-    console.error("Meeting intent classifier error:", error);
-    res.status(502).json({ availability: false, classified: false });
-  }
-});
-
 // 可用会议室查询直接调用希会，避免把“可预定”误解为“已有会议列表”。
 app.post("/api/meeting-availability", async (req, res) => {
   const date = truncateText(req.body?.date, 10);
@@ -603,249 +548,9 @@ app.post("/api/meeting-availability", async (req, res) => {
   }
 });
 
-// Dify API 代理接口
-app.post("/api/chat", async (req, res) => {
-  // 生产环境可以加上 authenticate，或者仅允许内网/有效 session 请求
-  const remoteUser = assistantUser(req);
-  const DIFY_API_URL = process.env.DIFY_API_URL || "";
-  const DIFY_API_KEY = process.env.DIFY_API_KEY || "";
-  const upstreamController = new AbortController();
-  let clientDisconnected = false;
-  const abortUpstream = () => {
-    if (!res.writableEnded && !res.destroyed) {
-      clientDisconnected = true;
-      upstreamController.abort();
-    }
-  };
-
-  req.on("aborted", abortUpstream);
-  res.on("close", abortUpstream);
-  
-  if (!DIFY_API_KEY) {
-    res.status(500).json({ success: false, message: "Server configuration error: DIFY_API_KEY is missing." });
-    req.off("aborted", abortUpstream);
-    res.off("close", abortUpstream);
-    return;
-  }
-
-  try {
-    const payload = {
-      ...req.body,
-      user: remoteUser
-    };
-    
-    // 中文名转换逻辑：仅使用 Authelia 注入的 remote-name 头
-    let remoteNameRaw = req.assistantIdentity ? encodeURIComponent(req.assistantIdentity.name) : req.headers["remote-name"] || req.headers["x-forwarded-user"] || "";
-    let chineseName = remoteUser;
-
-    if (remoteNameRaw) {
-      try {
-        chineseName = decodeURIComponent(remoteNameRaw);
-        // 如果 header 传来的是 base64 或者是 raw bytes，可能还需要特殊处理
-        // 由于 express 会将 header 解析为 latin1，如果是 utf8 被识别为 latin1 需要转换：
-        // chineseName = Buffer.from(remoteNameRaw, 'latin1').toString('utf8');
-      } catch(e) {
-        chineseName = remoteNameRaw;
-      }
-    }
-    
-    // 注入大模型所需的环境变量
-    payload.inputs = {
-      ...(payload.inputs || {}),
-      user_id: remoteUser,
-      user_name: chineseName,
-      current_time: new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })
-    };
-
-    // Dify can open an SSE stream and keep sending pings when an old provider
-    // conversation belongs to a different end user. Check ownership through
-    // the non-streaming messages API before starting any workflow.
-    if (req.assistantIdentity && payload.conversation_id) {
-      const messagesUrl = new URL(DIFY_API_URL.replace("/chat-messages", "/messages"));
-      messagesUrl.searchParams.set("conversation_id", payload.conversation_id);
-      messagesUrl.searchParams.set("user", remoteUser);
-      messagesUrl.searchParams.set("limit", "1");
-      const ownership = await fetch(messagesUrl, {
-        headers: { "Authorization": `Bearer ${DIFY_API_KEY}` },
-        signal: AbortSignal.any([upstreamController.signal, AbortSignal.timeout(8000)]),
-      });
-      if (!ownership.ok) {
-        const error = await ownership.json().catch(() => ({}));
-        if (ownership.status === 404 && ["not_found", "conversation_not_exists"].includes(error.code)) {
-          payload.conversation_id = "";
-        } else {
-          return res.status(502).json({ success: false, message: "无法核验当前对话，请新建对话后重试。" });
-        }
-      } else {
-        await ownership.body?.cancel();
-      }
-    }
-
-    const response = await fetch(DIFY_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${DIFY_API_KEY}`
-      },
-      body: JSON.stringify(payload),
-      signal: upstreamController.signal
-    });
-
-    res.writeHead(response.status, {
-      "Content-Type": response.headers.get("Content-Type") || "text/event-stream",
-      "Cache-Control": "no-cache",
-      "Connection": "keep-alive"
-    });
-
-    if (response.body) {
-      let sseBuffer = "";
-      let upstreamErrorSeen = false;
-      for await (const chunk of response.body) {
-        if (res.destroyed) break;
-        res.write(chunk);
-
-        // Dify may send an SSE error event with HTTP 200 and then leave the
-        // stream open. Stop forwarding as soon as that terminal error is seen
-        // so the proxy does not wait for an upstream body timeout.
-        sseBuffer += Buffer.from(chunk).toString("utf8");
-        const blocks = sseBuffer.split(/\n\n/);
-        sseBuffer = blocks.pop() || "";
-        for (const block of blocks) {
-          const dataLine = block.split(/\r?\n/).find((line) => line.startsWith("data:"));
-          if (!dataLine) continue;
-          const dataText = dataLine.slice(5).trim();
-          if (!dataText || dataText === "[DONE]") continue;
-          try {
-            const data = JSON.parse(dataText);
-            if (data?.event === "error") {
-              upstreamErrorSeen = true;
-              break;
-            }
-          } catch (error) {
-            // A JSON payload can be split across chunks; the next chunk will
-            // complete it, so leave it in the buffer path rather than failing.
-          }
-        }
-        if (upstreamErrorSeen) {
-          try {
-            await response.body.cancel();
-          } catch (error) {}
-          break;
-        }
-      }
-      if (!res.writableEnded && !res.destroyed) res.end();
-    } else {
-      if (!res.writableEnded && !res.destroyed) res.end();
-    }
-  } catch (error) {
-    if (clientDisconnected || upstreamController.signal.aborted) return;
-    console.error("Dify proxy error:", error);
-    if (res.headersSent) {
-      // Headers are already committed as SSE. Send a terminal SSE error
-      // instead of trying to change the status code and crashing Node with
-      // ERR_HTTP_HEADERS_SENT.
-      if (!res.writableEnded && !res.destroyed) {
-        try {
-          res.write(`event: error\n\ndata: ${JSON.stringify({
-            event: "error",
-            code: "proxy_error",
-            status: 502,
-            message: "助手服务暂时不可用，请稍后再试。"
-          })}\n\n`);
-          res.end();
-        } catch (writeError) {}
-      }
-    } else {
-      res.status(502).json({ success: false, message: "助手服务暂时不可用，请稍后再试。" });
-    }
-  } finally {
-    req.off("aborted", abortUpstream);
-    res.off("close", abortUpstream);
-  }
-});
-
-// Dify 文件上传代理
-app.post("/api/chat/upload", chatUpload.single("file"), async (req, res) => {
-  const remoteUser = assistantUser(req);
-  const DIFY_API_URL = process.env.DIFY_API_URL || "";
-  const DIFY_API_KEY = process.env.DIFY_API_KEY || "";
-  
-  if (!req.file || !DIFY_API_URL || !DIFY_API_KEY) {
-    return res.status(400).json({ success: false, message: "Missing file or Dify config" });
-  }
-
-  try {
-    const fileBuffer = fs.readFileSync(req.file.path);
-    const fileBlob = new Blob([fileBuffer], { type: req.file.mimetype });
-    
-    const formData = new FormData();
-    formData.append("file", fileBlob, req.file.originalname);
-    formData.append("user", remoteUser);
-
-    const uploadUrl = DIFY_API_URL.replace("/chat-messages", "/files/upload");
-
-    const response = await fetch(uploadUrl, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${DIFY_API_KEY}`
-      },
-      body: formData
-    });
-
-    const result = await response.json();
-    
-    // 清理临时文件
-    try {
-      fs.unlinkSync(req.file.path);
-    } catch(e) {}
-
-    if (response.ok && result.id) {
-      res.json({ success: true, file: result });
-    } else {
-      res.status(response.status).json({ success: false, message: result.message || "Upload failed", details: result });
-    }
-  } catch (error) {
-    console.error("Dify upload proxy error:", error);
-    res.status(500).json({ success: false, message: "Upload proxy failed" });
-  }
-});
-// Dify 语音转文字代理 (audio-to-text)
-app.post("/api/chat/audio", audioUpload.single("file"), async (req, res) => {
-  const remoteUser = assistantUser(req);
-  const DIFY_API_URL = process.env.DIFY_API_URL || "";
-  const DIFY_API_KEY = process.env.DIFY_API_KEY || "";
-
-  if (!req.file || !DIFY_API_URL || !DIFY_API_KEY) {
-    return res.status(400).json({ success: false, message: "Missing audio or Dify config" });
-  }
-
-  console.log(`[Audio] incoming: name=${req.file.originalname} mime=${req.file.mimetype} size=${req.file.size}`);
-  try {
-    const fileBlob = new Blob([req.file.buffer], { type: req.file.mimetype });
-    const formData = new FormData();
-    formData.append("file", fileBlob, req.file.originalname || "audio.webm");
-    formData.append("user", remoteUser);
-
-    const sttUrl = DIFY_API_URL.replace("/chat-messages", "/audio-to-text");
-
-    const response = await fetch(sttUrl, {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${DIFY_API_KEY}` },
-      body: formData
-    });
-
-    const result = await response.json();
-
-    if (response.ok && typeof result.text === "string") {
-      res.json({ success: true, text: result.text });
-    } else {
-      console.error(`[Audio] Dify STT failed: HTTP ${response.status}`, JSON.stringify(result));
-      res.status(response.status).json({ success: false, message: result.message || "语音识别失败", details: result });
-    }
-  } catch (error) {
-    console.error("Dify audio proxy error:", error);
-    res.status(500).json({ success: false, message: "Audio proxy failed" });
-  }
+app.post(["/api/chat", "/api/chat/upload", "/api/chat/audio", "/api/meeting-intent"], (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.status(410).json({ success: false, message: "旧版对话接口已下线，请刷新页面使用当前智能助手。" });
 });
 
 // 获取配置接口

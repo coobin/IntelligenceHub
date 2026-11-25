@@ -136,7 +136,7 @@ function listText(tool, result) {
 }
 
 async function askModel(messages, tools) {
-  if (!process.env.PORTAL_MODEL_KEY) throw failure(503, "新版助手的自由问答尚未启用。你可以使用下方的会议和报销快捷查询，或输入制度名称检索原文。");
+  if (!process.env.PORTAL_MODEL_KEY) throw failure(503, "智能助手的自由问答暂未启用。你可以使用下方的会议和报销快捷查询，或输入制度名称检索原文。");
   const response = await fetch(`${process.env.PORTAL_MODEL_BASE.replace(/\/$/, "")}/chat/completions`, {
     method: "POST", redirect: "error", signal: AbortSignal.timeout(60000),
     headers: { Authorization: `Bearer ${process.env.PORTAL_MODEL_KEY}`, "Content-Type": "application/json" },
@@ -171,7 +171,7 @@ export function installPortalAssistant(app, { assistantUser, assistantDisplayNam
     if (!req.headers["remote-user"]) return res.status(401).json({ message: "请先登录工作台。" });
     if (!process.env.PORTAL_ORIGIN || req.headers.origin !== process.env.PORTAL_ORIGIN ||
       !String(process.env.PORTAL_PROXY_IPS || "").split(",").includes(req.socket.remoteAddress?.replace(/^::ffff:/, "")))
-      return res.status(403).json({ message: "请通过公司统一入口使用测试版。" });
+      return res.status(403).json({ message: "请通过公司统一入口使用助手。" });
     next();
   });
   const invoiceUrl = () => `http://${process.env.INVOICE_HOST || "127.0.0.1"}:${Number(process.env.INVOICE_PORT) || 8082}/api/invoices`;
@@ -255,7 +255,7 @@ export function installPortalAssistant(app, { assistantUser, assistantDisplayNam
   app.post("/api/new/audio", audioUpload.single("file"), async (req, res) => {
     try {
       if (!req.file) throw failure(400, "请选择录音。");
-      if (!process.env.PORTAL_ASR_URL || !process.env.PORTAL_ASR_KEY) throw failure(503, "测试版尚未配置语音识别。");
+      if (!process.env.PORTAL_ASR_URL || !process.env.PORTAL_ASR_KEY) throw failure(503, "暂未配置语音识别。");
       const form = new FormData();
       form.append("file", new Blob([req.file.buffer], { type: req.file.mimetype }), "voice.wav");
       form.append("model", process.env.PORTAL_ASR_MODEL);

@@ -27,29 +27,20 @@ test("employee identity stays consistent across CIH chat, uploads and invoice pr
       }
       return res.end(JSON.stringify({ username: "employee", name }));
     }
-    if (req.url === "/v1/chat-messages") {
-      const payload = JSON.parse(body);
-      if (payload.conversation_id === "legacy-conversation") {
-        res.statusCode = 404;
-        return res.end(JSON.stringify({ code: "conversation_not_exists" }));
+    if (req.url === "/mcp") {
+      const rpc = JSON.parse(body);
+      if (rpc.method === "notifications/initialized") {
+        res.statusCode = 202;
+        return res.end();
       }
-      res.setHeader("Content-Type", "text/event-stream");
-      return res.end('data: {"event":"message_end","conversation_id":"new-conversation"}\n\n');
+      if (rpc.method === "initialize") {
+        return res.end(JSON.stringify({ jsonrpc: "2.0", id: rpc.id, result: { protocolVersion: "2025-06-18" } }));
+      }
+      if (rpc.method === "tools/call") {
+        return res.end(JSON.stringify({ jsonrpc: "2.0", id: rpc.id, result: { structuredContent: { status: "succeeded", summary: "ok", data: { records: [] } } } }));
+      }
+      return res.end(JSON.stringify({ jsonrpc: "2.0", id: rpc.id, result: { tools: [] } }));
     }
-    if (req.url.startsWith("/v1/messages?")) {
-      const conversation = new URL(req.url, "http://upstream.invalid").searchParams.get("conversation_id");
-      if (conversation === "legacy-conversation") {
-        res.statusCode = 404;
-        return res.end('{"code":"not_found","message":"Conversation Not Exists."}');
-      }
-      if (conversation === "unavailable") {
-        res.statusCode = 503;
-        return res.end('{"code":"unavailable"}');
-      }
-      return res.end('{"data":[]}');
-    }
-    if (req.url === "/v1/files/upload") return res.end('{"id":"file-1"}');
-    if (req.url === "/v1/audio-to-text") return res.end('{"text":"查询通讯费"}');
     res.end('{"ok":true}');
   });
   upstream.listen(0, "127.0.0.1");
@@ -68,7 +59,8 @@ test("employee identity stays consistent across CIH chat, uploads and invoice pr
   await symlink(path.join(root, "node_modules"), path.join(folder, "node_modules"));
   const child = spawn(process.execPath, [path.join(folder, "server.js")], { env: {
     ...process.env, PORT: String(port), INVOICE_HOST: "127.0.0.1", INVOICE_PORT: String(upstreamPort),
-    DIFY_API_URL: `http://127.0.0.1:${upstreamPort}/v1/chat-messages`, DIFY_API_KEY: "test-only", ADMIN_REMOTE_USER: "admin",
+    PORTAL_MCP_URL: `http://127.0.0.1:${upstreamPort}/mcp`, PORTAL_MCP_SECRET: "test-secret",
+    PORTAL_ORIGIN: "https://portal.example", PORTAL_PROXY_IPS: "127.0.0.1", ADMIN_REMOTE_USER: "admin",
   }, stdio: ["ignore", "pipe", "pipe"] });
   const exited = once(child, "exit");
   try {
@@ -78,34 +70,26 @@ test("employee identity stays consistent across CIH chat, uploads and invoice pr
       child.on("error", reject);
     });
     const base = `http://127.0.0.1:${port}`;
-    const chat = (headers, extra = {}) => fetch(`${base}/api/chat`, { method: "POST", headers: {
-      ...headers, "Content-Type": "application/json",
-    }, body: JSON.stringify({ query: "通讯费报销记录", user: "spoofed-user", inputs: { user_id: "spoofed-user" }, ...extra }) });
+    const chat = (headers, query = "查询我的通讯费报销记录") => fetch(`${base}/api/new/chat`, { method: "POST", headers: {
+      ...headers,
+      "Content-Type": "application/json",
+      Origin: "https://portal.example",
+      Cookie: "authelia_session=test",
+    }, body: JSON.stringify({ query, session: "sso-test-session" }) });
 
     await t.test("ordinary account and admin checks retain their existing identity", async () => {
       const auth = await fetch(`${base}/api/check-auth`, { headers: { "remote-user": "employee" } });
       assert.deepEqual(await auth.json(), { authenticated: false, user: "employee" });
-      await (await chat({ "remote-user": "employee" })).text();
-      assert.equal(JSON.parse(calls.at(-1).body).user, "employee");
+      assert.equal((await chat({ "remote-user": "employee" })).status, 200);
+      assert.equal(calls.filter((call) => call.url === "/mcp").at(-1).headers["x-portal-employee"], "employee");
       const admin = await fetch(`${base}/api/check-auth`, { headers: { "remote-user": "admin" } });
       assert.equal((await admin.json()).authenticated, true);
     });
-    await t.test("cloud session, tool inputs and file owner use the same directory account", async () => {
+    await t.test("cloud session forwards resolved directory account to portal MCP", async () => {
       const auth = await fetch(`${base}/api/check-auth`, { headers: cloudHeaders });
       assert.deepEqual(await auth.json(), { authenticated: false, user: "employee" });
-      await (await chat(cloudHeaders)).text();
-      const payload = JSON.parse(calls.at(-1).body);
-      assert.equal(payload.user, "employee");
-      assert.equal(payload.inputs.user_id, "employee");
-      assert.equal(payload.inputs.user_name, "员工");
-      const file = new FormData();
-      file.append("file", new Blob(["test"], { type: "application/pdf" }), "test.pdf");
-      assert.equal((await fetch(`${base}/api/chat/upload`, { method: "POST", headers: cloudHeaders, body: file })).status, 200);
-      assert.match(calls.at(-1).body, /name="user"\r\n\r\nemployee/);
-      const audio = new FormData();
-      audio.append("file", new Blob(["test"], { type: "audio/wav" }), "test.wav");
-      assert.equal((await fetch(`${base}/api/chat/audio`, { method: "POST", headers: cloudHeaders, body: audio })).status, 200);
-      assert.match(calls.at(-1).body, /name="user"\r\n\r\nemployee/);
+      assert.equal((await chat(cloudHeaders)).status, 200);
+      assert.equal(calls.filter((call) => call.url === "/mcp").at(-1).headers["x-portal-employee"], "employee");
     });
     await t.test("native invoice proxy forwards verified employee identity and JSON body", async () => {
       await fetch(`${base}/invoice-proxy/api/invoices/example`, { method: "POST", headers: {
@@ -115,36 +99,23 @@ test("employee identity stays consistent across CIH chat, uploads and invoice pr
       assert.equal(decodeURIComponent(calls.at(-1).headers["remote-name"]), "员工");
       assert.deepEqual(JSON.parse(calls.at(-1).body), { example: true });
     });
-    await t.test("unmatched and unavailable identities stop before a workflow or upload", async () => {
+    await t.test("unmatched and unavailable identities stop before reaching portal MCP", async () => {
       for (const name of ["unknown", "unavailable"]) {
-        const before = calls.filter((call) => call.url === "/v1/chat-messages").length;
+        const before = calls.filter((call) => call.url === "/mcp").length;
         const response = await chat({ ...cloudHeaders, "remote-name": name });
         assert.equal(response.status, name === "unknown" ? 409 : 503);
         assert.equal((await response.json()).message, "身份核验失败");
-        assert.equal(calls.filter((call) => call.url === "/v1/chat-messages").length, before);
+        assert.equal(calls.filter((call) => call.url === "/mcp").length, before);
       }
     });
-    await t.test("old provider conversation is checked before workflow execution; valid employee conversations continue", async () => {
-      const before = calls.filter((call) => call.url === "/v1/chat-messages").length;
-      assert.equal((await chat(cloudHeaders, { conversation_id: "legacy-conversation" })).status, 200);
-      const newCalls = calls.filter((call) => call.url === "/v1/chat-messages").slice(before).map((call) => JSON.parse(call.body));
-      assert.equal(newCalls.length, 1);
-      assert.equal(newCalls[0].conversation_id, "");
-      assert.ok(newCalls.every((call) => call.user === "employee"));
-      const ownership = calls.find((call) => call.url.startsWith("/v1/messages?"));
-      assert.equal(new URL(ownership.url, "http://upstream.invalid").searchParams.get("user"), "employee");
-      assert.equal((await chat(cloudHeaders, { conversation_id: "employee-conversation" })).status, 200);
-      assert.equal(JSON.parse(calls.at(-1).body).conversation_id, "employee-conversation");
-      const ordinaryBefore = calls.length;
-      assert.equal((await chat({ "remote-user": "employee" }, { conversation_id: "legacy-conversation" })).status, 404);
-      assert.equal(calls.length, ordinaryBefore + 1);
-    });
-    await t.test("ownership service outage does not start or repeat a workflow", async () => {
-      const before = calls.filter((call) => call.url === "/v1/chat-messages").length;
-      const response = await chat(cloudHeaders, { conversation_id: "unavailable" });
-      assert.equal(response.status, 502);
-      assert.match((await response.json()).message, /新建对话/);
-      assert.equal(calls.filter((call) => call.url === "/v1/chat-messages").length, before);
+    await t.test("retired legacy Dify endpoints return 410 and /new redirects to /", async () => {
+      for (const route of ["/api/chat", "/api/chat/upload", "/api/chat/audio", "/api/meeting-intent"]) {
+        const res = await fetch(`${base}${route}`, { method: "POST" });
+        assert.equal(res.status, 410);
+      }
+      const redirectRes = await fetch(`${base}/new`, { redirect: "manual" });
+      assert.equal(redirectRes.status, 302);
+      assert.equal(redirectRes.headers.get("location"), "/");
     });
   } finally {
     child.kill("SIGTERM");

@@ -1,4 +1,4 @@
-const portalAssistant = location.pathname === "/new";
+const portalAssistant = true;
 const iconMapping = {
   "邮件": "mail",
   "邮箱": "mail",
@@ -1705,7 +1705,6 @@ function renderAssistant() {
   if (!inputEl || !sendBtn || !messagesEl) return;
 
   const userStorageSuffix = (portalAssistant ? "portal:" : "") + encodeURIComponent(state.user || "anonymous");
-  if (portalAssistant) inputEl.placeholder = "搜入口，或问新版助手…";
   const legacyHistoryKey = `${CHAT_HISTORY_LEGACY_STORAGE_PREFIX}:${userStorageSuffix}`;
   const sessionsKey = `${CHAT_SESSIONS_STORAGE_PREFIX}:${userStorageSuffix}`;
   const welcomeText = messagesEl.querySelector(".assistant-message-system .assistant-message-content")?.textContent?.trim()
