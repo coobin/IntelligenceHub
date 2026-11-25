@@ -1626,17 +1626,24 @@ function expensePeriodParts(period) {
 function renderExpenseUi(ui) {
   const records = Array.isArray(ui.records) ? ui.records : [];
   const summary = ui.summary || {};
+  const invoiceList = ui.type === "invoice_list";
+  const amountLabel = value => value == null ? "未提供" : expenseMoney(value);
   const isEmpty = ui.type === "history_empty" || records.length === 0;
   const recordList = records.map((record) => {
-    const period = expensePeriodParts(record.period);
+    const periods = invoiceList ? record.periods || [] : [];
+    const period = invoiceList && periods.length !== 1
+      ? { year: "账期", month: periods.length ? "跨月" : "待定" }
+      : expensePeriodParts(invoiceList ? periods[0] : record.period);
+    const details = invoiceList ? [periods.length > 1 ? periods.join(" / ") : "", record.date && `提交于 ${record.date}`].filter(Boolean).join(" · ")
+      : record.phone || (record.phones || []).join(" / ") || "号码未知";
     return `
       <article class="expense-record">
         <div class="expense-period"><small>${escapeHtml(period.year)}</small><strong>${escapeHtml(period.month)}</strong></div>
         <div class="expense-record-main">
-          <div class="expense-record-phone"><i data-lucide="smartphone"></i><span>${escapeHtml(record.phone || (record.phones || []).join(" / ") || "号码未知")}</span></div>
+          <div class="expense-record-phone"><i data-lucide="${invoiceList ? "calendar-days" : "smartphone"}"></i><span>${escapeHtml(details)}</span></div>
           <div class="expense-record-amounts">
-            <span><small>发票金额</small><strong>${escapeHtml(expenseMoney(record.invoiceAmount))}</strong></span>
-            <span><small>实报金额</small><strong>${escapeHtml(expenseMoney(record.reimbursedAmount))}</strong></span>
+            <span><small>发票金额</small><strong>${escapeHtml(amountLabel(record.invoiceAmount))}</strong></span>
+            <span><small>${invoiceList ? "状态" : "实报金额"}</small><strong>${escapeHtml(invoiceList ? record.status || "未提供" : amountLabel(record.reimbursedAmount))}</strong></span>
           </div>
         </div>
       </article>
@@ -1648,7 +1655,7 @@ function renderExpenseUi(ui) {
       <header class="expense-ui-header">
         <span class="expense-ui-icon"><i data-lucide="receipt-text"></i></span>
         <span class="expense-ui-heading"><small>通讯费报销</small><strong>${escapeHtml(ui.title || "历史报销记录")}</strong></span>
-        <span class="expense-range">${escapeHtml(ui.range?.label || "最近一年")}</span>
+        ${!invoiceList || ui.range?.label ? `<span class="expense-range">${escapeHtml(ui.range?.label || "最近一年")}</span>` : ""}
       </header>
       <div class="expense-ui-body">
         ${isEmpty ? `
@@ -1659,12 +1666,12 @@ function renderExpenseUi(ui) {
           </div>
         ` : `
           <div class="expense-summary">
-            <span><small>发票合计</small><strong>${escapeHtml(expenseMoney(summary.invoiceAmount))}</strong></span>
-            <span><small>实报合计</small><strong>${escapeHtml(expenseMoney(summary.reimbursedAmount))}</strong></span>
+            <span><small>${invoiceList ? "所列发票合计" : "发票合计"}</small><strong>${escapeHtml(amountLabel(summary.invoiceAmount))}</strong></span>
+            <span><small>${invoiceList ? "所列记录" : "实报合计"}</small><strong>${invoiceList ? records.length + " 条" : escapeHtml(amountLabel(summary.reimbursedAmount))}</strong></span>
           </div>
-          <p class="expense-ui-message">${escapeHtml(ui.message || "按账期汇总已确认报销。")}</p>
+          ${invoiceList ? "" : `<p class="expense-ui-message">${escapeHtml(ui.message || "按账期汇总已确认报销。")}</p>`}
           <div class="expense-record-list">${recordList}</div>
-          <footer class="expense-ui-footer"><span>${Number(summary.count || records.length)} 个账期</span><span>${escapeHtml(ui.range?.label || "最近一年")}</span></footer>
+          ${invoiceList ? "" : `<footer class="expense-ui-footer"><span>${Number(summary.count || records.length)} 个账期</span><span>${escapeHtml(ui.range?.label || "最近一年")}</span></footer>`}
         `}
       </div>
     </section>
@@ -2058,9 +2065,21 @@ function renderAssistant() {
       let reply;
       try { reply = JSON.parse(text); } catch { reply = { text }; }
       const answer = String(reply?.text || "");
-      contentDiv.innerHTML = (window.DOMPurify && window.marked
+      const answerHtml = window.DOMPurify && window.marked
         ? window.DOMPurify.sanitize(window.marked.parse(escapeHtml(answer)))
-        : escapeHtml(answer)) + renderCitations(reply?.citations);
+        : escapeHtml(answer);
+      const card = reply?.card;
+      const kind = card?.type === "invoice_list" ? "expense" :
+        ["query_results", "query_empty", "availability_results", "availability_empty"].includes(card?.type) ? "meeting" : "";
+      if (kind) {
+        contentDiv.parentElement?.classList.add(`assistant-message-${kind}`);
+        contentDiv.classList.add(`has-${kind}-ui`);
+        contentDiv.innerHTML = (reply.showAnswer ? answerHtml : "") +
+          (kind === "expense" ? renderExpenseUi(card) : renderMeetingUi(card)) + renderCitations(reply.citations);
+        window.lucide?.createIcons();
+        return;
+      }
+      contentDiv.innerHTML = answerHtml + renderCitations(reply?.citations);
       if (reply?.confirm) {
         const button = document.createElement("button");
         button.type = "button";

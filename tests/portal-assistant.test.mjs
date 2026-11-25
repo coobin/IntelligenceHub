@@ -22,6 +22,16 @@ test("portal scopes confirmation to employee and conversation and consumes it on
       name, inputSchema: { type: "object" },
     })) };
     if (method === "tools/call") {
+      if (params.name === "invoice_list_reimbursements") {
+        const records = [{ amount: "123.45", billing_periods: ["202605", "202606"], status: "archived", created_at: "2026-07-01" }];
+        return res.json({ id, jsonrpc: "2.0", result: { structuredContent: { status: "succeeded",
+          summary: "共两条记录", data: { records, page: 1, total: 2 } } } });
+      }
+      if (params.name === "meet_list_meetings") {
+        const meetings = [{ date: params.arguments.date, title: "例会", attendees: [{ name: "测试" }], start: "10:00", end: "11:00" }];
+        return res.json({ id, jsonrpc: "2.0", result: { structuredContent: { status: "succeeded",
+          summary: "共一场会议", data: { meetings } } } });
+      }
       if (params.name === "meet_check_availability") {
         assert.deepEqual(params.arguments, { date: new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai" }).format(new Date()) });
         return res.json({ id, jsonrpc: "2.0", result: { structuredContent: { status: "succeeded",
@@ -71,7 +81,18 @@ test("portal scopes confirmation to employee and conversation and consumes it on
   assert.equal(writes, 1);
   delete process.env.PORTAL_MODEL_KEY;
   const rooms = await chat("first", "rooms", undefined, "今天的会议室情况是啥？");
-  assert.equal((await rooms.json()).text, "已查询会议室空闲时段");
+  const empty = await rooms.json();
+  assert.equal(empty.text, "已查询会议室空闲时段");
+  assert.equal(empty.card.type, "availability_empty");
+  const expense = (await (await chat("first", "expense", undefined, "查询我的通讯费报销记录")).json()).card;
+  assert.equal(expense.type, "invoice_list");
+  assert.equal(expense.range.label, "第 1 页 · 共 2 条");
+  assert.equal(expense.summary.invoiceAmount, 123.45);
+  assert.deepEqual(expense.records[0].periods, ["202605", "202606"]);
+  assert.equal(expense.records[0].status, "已归档");
+  const meeting = (await (await chat("first", "meetings", undefined, "查一下我今天的会议")).json()).card;
+  assert.equal(meeting.type, "query_results");
+  assert.equal(meeting.meetings[0].attendeeCount, 1);
   const policy = await fetch(base + "/api/new/chat", { method: "POST",
     headers: { "Content-Type": "application/json", "Remote-User": "first", Origin: process.env.PORTAL_ORIGIN, Cookie: "authelia_session=test" },
     body: JSON.stringify({ query: "差旅制度", session: "policy" }) });
@@ -165,7 +186,10 @@ test("portal persists sanitized chat logs, prunes expired files, and exposes adm
 
   const firstTurn = await postChat("alice", "Alice", "sess-1", "明天有哪些会议室空闲？");
   assert.equal(firstTurn.status, 200);
-  assert.equal((await firstTurn.json()).text, "明天 D01 10:00-11:00 空闲。");
+  const reply = await firstTurn.json();
+  assert.equal(reply.text, "明天 D01 10:00-11:00 空闲。");
+  assert.equal(reply.card.rooms[0].freeSlots[0].start, "10:00");
+  assert.equal(reply.showAnswer, true);
 
   const secondTurn = await postChat("alice", "Alice", "sess-1", "今天的会议室情况是啥？");
   assert.equal(secondTurn.status, 200);

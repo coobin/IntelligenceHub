@@ -119,18 +119,57 @@ async function connectCenter(req, user) {
   return rpc;
 }
 
+const reimbursementStatuses = { confirmed: "已确认", queued: "待导出", exported: "已导出", archived: "已归档" };
+
+function queryCard(tool, result, args) {
+  if (result.status !== "succeeded" || !result.data) return;
+  const data = result.data;
+  if (tool === "invoice_list_reimbursements" && Array.isArray(data.records)) {
+    const records = data.records.map(item => ({
+      periods: (item.billing_periods || []).filter(period => /^\d{6}$/.test(period)),
+      date: String(item.created_at || "").slice(0, 10),
+      status: reimbursementStatuses[item.status] || item.status,
+      invoiceAmount: item.amount == null || item.amount === "" ? null : Number(item.amount),
+    }));
+    const total = data.total ?? records.length;
+    return { type: "invoice_list", title: "我的报销记录", records,
+      range: { label: total > records.length ? `第 ${data.page || 1} 页 · 共 ${total} 条` : "" },
+      message: records.length ? "" : "当前查询范围内没有报销记录。",
+      summary: { invoiceAmount: records.every(row => Number.isFinite(row.invoiceAmount))
+        ? records.reduce((cents, row) => cents + Math.round(row.invoiceAmount * 100), 0) / 100 : null } };
+  }
+  if (tool === "meet_list_meetings" && Array.isArray(data.meetings)) {
+    const meetings = data.meetings.map(({ date, start, end, title, roomName, organizerName, attendees }) =>
+      ({ date, start, end, title, roomName, organizerName, attendeeCount: attendees?.length }));
+    const total = data.total ?? meetings.length;
+    const title = args.mine ? "我的会议" : "会议日程";
+    return { type: meetings.length ? "query_results" : "query_empty", meetings,
+      title: total > meetings.length ? `${title} · 第 ${data.page || 1} 页（共 ${total} 场）` : title,
+      message: meetings.length ? "" : `${args.date || "当前查询范围内"}没有符合条件的会议。` };
+  }
+  if (tool === "meet_check_availability" && Array.isArray(data.rooms) && !data.invalid?.length) {
+    const rooms = data.rooms.filter(item => item.available !== false && item.freeSlots?.length)
+      .map(({ room, freeSlots }) => ({ name: room?.name, capacity: room?.capacity, freeSlots }));
+    return { type: rooms.length ? "availability_results" : "availability_empty", rooms,
+      title: "会议室空闲时段", filters: { date: data.date || args.date },
+      message: rooms.length ? "" : `${data.date || args.date || "当前查询范围"}没有符合条件的空闲时段。` };
+  }
+}
+
 function listText(tool, result) {
+  if (result.status !== "succeeded") return result.summary;
   const data = result.data || {};
   let lines = [];
   if (tool === "meet_list_meetings") lines = (data.meetings || []).map(item =>
     [item.date, `${item.start}–${item.end}`, item.title, item.roomName].filter(Boolean).join(" · "));
   if (tool === "meet_check_availability") lines = (data.rooms || []).map(item => {
     const slots = (item.freeSlots || []).map(slot => `${slot.start}–${slot.end}`).join("、");
-    return `${item.room?.name || "会议室"} · ${slots || (item.available ? "可用" : "无可用时段")}`;
+    return `${item.room?.name || "会议室"} · ${slots || "无可用时段"}`;
   });
   if (tool === "invoice_list_reimbursements") lines = (data.records || []).map(item => {
-    const label = { confirmed: "已确认", queued: "待导出", exported: "已导出", archived: "已归档" }[item.status] || item.status;
-    return `${String(item.created_at || "").slice(0, 10)} · ¥${item.amount} · ${label}`;
+    const label = reimbursementStatuses[item.status] || item.status;
+    return [item.billing_periods?.join(" / "), String(item.created_at || "").slice(0, 10),
+      item.amount != null ? `票面 ¥${item.amount}` : "", label].filter(Boolean).join(" · ");
   });
   return [result.summary, ...lines.map(line => `- ${line}`)].join("\n");
 }
@@ -355,7 +394,7 @@ export function installPortalAssistant(app, { assistantUser, assistantDisplayNam
         const result = await call(fixed, args);
         const text = listText(fixed, result);
         recordTurn({ answer: text, status: result.status });
-        return res.json({ text, status: result.status });
+        return res.json({ text, status: result.status, card: queryCard(fixed, result, args) });
       }
       const policy = /制度|规定|办法|政策|规章|标准|条例|细则/.test(query);
       const search = async text => {
@@ -383,6 +422,7 @@ export function installPortalAssistant(app, { assistantUser, assistantDisplayNam
       messages.push({ role: "user", content: query });
       if (policy) messages.push({ role: "user", content: `制度检索结果：${JSON.stringify(citations)}` });
       modelName = process.env.PORTAL_MODEL || "";
+      let card;
       for (let round = 0; round < 6; round++) {
         const { message, usage } = await askModel(messages, tools);
         usageTotals.promptTokens += usage.promptTokens;
@@ -391,7 +431,7 @@ export function installPortalAssistant(app, { assistantUser, assistantDisplayNam
         if (!message.tool_calls?.length) {
           const text = message.content || "请补充一下查询条件。";
           recordTurn({ answer: text, status: "succeeded", citations });
-          return res.json({ text, citations });
+          return res.json({ text, citations, ...(card && toolsCalled.length === 1 ? { card, showAnswer: true } : {}) });
         }
         messages.push(message);
         for (const request of message.tool_calls) {
@@ -414,6 +454,7 @@ export function installPortalAssistant(app, { assistantUser, assistantDisplayNam
               return res.json(response);
             }
             payload = result.data ?? result.summary;
+            card = queryCard(name, result, args);
           }
           messages.push({ role: "tool", tool_call_id: request.id, content: JSON.stringify(payload).slice(0, 22000) });
         }
