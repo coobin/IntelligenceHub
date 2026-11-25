@@ -3,13 +3,7 @@ import { once } from "node:events";
 import test from "node:test";
 import express from "express";
 import multer from "multer";
-import { installPortalAssistant, policySearch } from "../portal-assistant.js";
-
-test("policy citations point to matching documents", () => {
-  const rows = [{ documentName: "培训", content: "请联系培训负责人。" }, { documentName: "差旅管理", content: "出差需事先批准。" }];
-  assert.deepEqual(policySearch(rows, "公司差旅制度"), [rows[1]]);
-  assert.deepEqual(policySearch(rows, "没有匹配的词组"), []);
-});
+import { installPortalAssistant } from "../portal-assistant.js";
 
 test("portal scopes confirmation to employee and conversation and consumes it once", async t => {
   const upstream = express();
@@ -25,6 +19,11 @@ test("portal scopes confirmation to employee and conversation and consumes it on
       name, inputSchema: { type: "object" },
     })) };
     if (method === "tools/call") {
+      if (params.name === "policy_search") {
+        assert.equal(params.arguments.query, "差旅制度");
+        return res.json({ id, jsonrpc: "2.0", result: { structuredContent: { status: "succeeded",
+          summary: "制度", data: { citations: [{ documentName: "差旅", content: "出差应事先批准。" }] } } } });
+      }
       if (params.name === "meet_confirm_booking") {
         writes++;
         assert.deepEqual(params.arguments, { operation_id: "preview-1" });
@@ -62,4 +61,9 @@ test("portal scopes confirmation to employee and conversation and consumes it on
   assert.equal((await (await chat("first", "one", preview.confirm)).json()).status, "succeeded");
   assert.equal((await chat("first", "one", preview.confirm)).status, 409);
   assert.equal(writes, 1);
+  delete process.env.PORTAL_MODEL_KEY;
+  const policy = await fetch(base + "/api/new/chat", { method: "POST",
+    headers: { "Content-Type": "application/json", "Remote-User": "first", Origin: process.env.PORTAL_ORIGIN, Cookie: "authelia_session=test" },
+    body: JSON.stringify({ query: "差旅制度", session: "policy" }) });
+  assert.deepEqual((await policy.json()).citations, [{ documentName: "差旅", content: "出差应事先批准。" }]);
 });

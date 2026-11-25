@@ -199,7 +199,7 @@ function assistantUser(req) {
   return req.assistantIdentity?.username || req.headers["remote-user"] || "anonymous";
 }
 
-installPortalAssistant(app, { assistantUser, audioUpload, root: __dirname });
+installPortalAssistant(app, { assistantUser, audioUpload });
 app.get("/new", (req, res) => {
   if (req.path.endsWith("/")) return res.redirect(302, "/new");
   res.set("Cache-Control", "no-store").sendFile(path.join(__dirname, "index.html"));
