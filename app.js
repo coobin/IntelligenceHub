@@ -1,3 +1,4 @@
+const portalAssistant = location.pathname === "/new";
 const iconMapping = {
   "邮件": "mail",
   "邮箱": "mail",
@@ -1703,7 +1704,8 @@ function renderAssistant() {
 
   if (!inputEl || !sendBtn || !messagesEl) return;
 
-  const userStorageSuffix = encodeURIComponent(state.user || "anonymous");
+  const userStorageSuffix = (portalAssistant ? "portal:" : "") + encodeURIComponent(state.user || "anonymous");
+  if (portalAssistant) inputEl.placeholder = "搜入口，或问新版助手…";
   const legacyHistoryKey = `${CHAT_HISTORY_LEGACY_STORAGE_PREFIX}:${userStorageSuffix}`;
   const sessionsKey = `${CHAT_SESSIONS_STORAGE_PREFIX}:${userStorageSuffix}`;
   const welcomeText = messagesEl.querySelector(".assistant-message-system .assistant-message-content")?.textContent?.trim()
@@ -1874,7 +1876,7 @@ function renderAssistant() {
   };
   
   if (attachBtn && attachInput && attachPool) {
-    attachBtn.addEventListener("click", () => attachInput.click());
+    attachBtn.addEventListener("click", () => (portalAssistant ? document.getElementById("nativeInvoiceUpload") : attachInput).click());
     
     attachInput.addEventListener("change", async (e) => {
       const files = Array.from(e.target.files);
@@ -2053,6 +2055,27 @@ function renderAssistant() {
   };
 
   const renderSystemReply = (contentDiv, text, complete = false) => {
+    if (portalAssistant) {
+      let reply;
+      try { reply = JSON.parse(text); } catch { reply = { text }; }
+      const answer = String(reply?.text || "");
+      contentDiv.innerHTML = (window.DOMPurify && window.marked
+        ? window.DOMPurify.sanitize(window.marked.parse(escapeHtml(answer)))
+        : escapeHtml(answer)) + renderCitations(reply?.citations);
+      if (reply?.confirm) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "quick-prompt-chip";
+        button.textContent = "确认提交";
+        button.onclick = () => {
+          if (requestInFlight) return;
+          button.disabled = true;
+          sendMessage({ queryText: "确认提交", confirm: reply.confirm });
+        };
+        contentDiv.append(button);
+      }
+      return;
+    }
     const citationsParsed = parseCitationsReply(text);
     const cleanReply = stripThinkingContent(citationsParsed.cleanText, complete);
     const meetingParsed = parseMeetingUiReply(cleanReply);
@@ -2369,7 +2392,7 @@ function renderAssistant() {
       try {
         const formData = new FormData();
         formData.append("file", blob, `voice.${ext}`);
-        const res = await fetch("/api/chat/audio", { method: "POST", body: formData });
+        const res = await fetch(portalAssistant ? "/api/new/audio" : "/api/chat/audio", { method: "POST", body: formData });
         const result = await res.json();
         if (result.success && result.text?.trim()) {
           inputEl.value = (inputEl.value ? inputEl.value + " " : "") + result.text.trim();
@@ -2380,7 +2403,7 @@ function renderAssistant() {
         }
       } catch (err) {
         console.error("[Voice] transcription error:", err);
-        appendMessage("system", "语音识别失败，请重试或改用文字输入。");
+        appendMessage("system", portalAssistant ? escapeHtml(err.message) : "语音识别失败，请重试或改用文字输入。");
       } finally {
         setMicState(false, false);
       }
@@ -2441,6 +2464,46 @@ function renderAssistant() {
     const typedText = inputEl.value.trim();
     let text = options.queryText !== undefined ? options.queryText : typedText;
     let displayText = options.displayText !== undefined ? options.displayText : typedText;
+
+    if (portalAssistant) {
+      if (!text.trim()) return;
+      if (!options.confirm) ensureDailySessionBeforeSend();
+      setAssistantExpanded(true);
+      setSessionControlsLocked(true);
+      const history = chatHistory.slice(-10).map(item => {
+        if (item.role === "user") return { role: "user", text: item.text };
+        try { return { role: "assistant", text: JSON.parse(item.text).text }; }
+        catch { return { role: "assistant", text: item.text }; }
+      });
+      let confirm = options.confirm;
+      if (!confirm && /^(确认|确认预定|确认预约|确认取消|确认提交)[。！!]?$/u.test(text)) {
+        try { confirm = JSON.parse(chatHistory.at(-1)?.text).confirm; } catch {}
+      }
+      inputEl.value = "";
+      inputEl.dispatchEvent(new Event("input"));
+      appendMessage("user", escapeHtml(text));
+      const output = appendMessage("system", "正在查询…", { skipHistory: true });
+      try {
+        const response = await fetch("/api/new/chat", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: text, session: activeSessionId, history, confirm }),
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message || "助手请求失败。");
+        const saved = JSON.stringify(result);
+        renderSystemReply(output, saved, true);
+        rememberMessage("system", saved);
+      } catch (err) {
+        const message = confirm ? `${err.message} 请核对本人会议记录后再操作。` : err.message;
+        output.textContent = message;
+        rememberMessage("system", JSON.stringify({ text: message }));
+      } finally {
+        setSessionControlsLocked(false);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+        inputEl.focus();
+      }
+      return;
+    }
 
     if (options.queryText === undefined && pendingMeetingAction && /^(确认|确认预定|确认取消|确定|可以|没问题)[。！!\s]*$/.test(typedText)) {
       const label = pendingMeetingAction.operation === "cancel" ? "确认取消" : "确认预定";
@@ -3188,13 +3251,13 @@ if (nativeUploadBtn && nativeInvoiceUpload) {
         try {
           const formData = new FormData();
           formData.append("file", file);
-          const res = await fetch("/invoice-proxy/api/invoices/chat-submit", {
+          const res = await fetch(portalAssistant ? "/api/new/invoice" : "/invoice-proxy/api/invoices/chat-submit", {
             method: "POST",
             body: formData
           });
           const data = await res.json();
           if (!res.ok) throw new Error(data.message || data.detail || "识别失败");
-          results.push({ file, success: true, invoice: data.invoice });
+          results.push({ file, success: true, invoice: data.invoice, confirm: data.confirm });
         } catch (err) {
           results.push({ file, success: false, error: err.message });
         }
@@ -3227,11 +3290,11 @@ if (nativeUploadBtn && nativeInvoiceUpload) {
             </h4>
             <div class="invoice-detail-row">
               <div class="invoice-detail-label">发票号码</div>
-              <div class="invoice-detail-value">${no}</div>
+              <div class="invoice-detail-value">${escapeHtml(String(no))}</div>
             </div>
             <div class="invoice-detail-row">
               <div class="invoice-detail-label">发票金额</div>
-              <div class="invoice-detail-value">¥ ${amount}</div>
+              <div class="invoice-detail-value">¥ ${escapeHtml(String(amount))}</div>
             </div>
             <div class="invoice-detail-row">
               <div class="invoice-detail-label">审核状态</div>
@@ -3273,16 +3336,18 @@ if (nativeUploadBtn && nativeInvoiceUpload) {
           
           try {
             const confirmPromises = compliantInvoices.map(r => 
-              fetch(`/invoice-proxy/api/invoices/${r.invoice.id}/confirm`, { method: 'POST' })
+              portalAssistant ? fetch("/api/new/invoice/confirm", { method: "POST",
+                headers: { "Content-Type": "application/json" }, body: JSON.stringify({ confirm: r.confirm }) }) :
+                fetch(`/invoice-proxy/api/invoices/${r.invoice.id}/confirm`, { method: 'POST' })
             );
-            await Promise.all(confirmPromises);
+            const responses = await Promise.all(confirmPromises);
+            if (responses.some(response => !response.ok)) throw new Error("confirmation failed");
             showToast(`✅ 已成功提交 ${compliantInvoices.length} 张发票进入报销池`);
             modal.setAttribute('aria-hidden', 'true');
             loadHomeSummary({ forceRefresh: true });
           } catch(e) {
-            showToast("❌ 网络异常，部分发票提交失败", true);
-            btn.disabled = false;
-            btn.innerHTML = `确认提交报销 (${compliantInvoices.length}张)`;
+            showToast("暂时无法确认全部结果，请核对报销记录。", true);
+            btn.textContent = "请核对报销记录";
           }
         };
       } else {

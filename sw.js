@@ -1,4 +1,4 @@
-const CACHE_NAME = "intelligence-hub-v97";
+const CACHE_NAME = "intelligence-hub-v98";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -33,6 +33,7 @@ self.addEventListener("fetch", (event) => {
 
   if (url.origin === self.location.origin && (
     url.pathname.startsWith("/api/") ||
+    /^\/new\/?$/.test(url.pathname) ||
     url.pathname === "/admin" ||
     url.pathname === "/admin.js" ||
     url.pathname === "/data/catalog.json" ||

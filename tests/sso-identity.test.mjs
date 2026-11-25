@@ -63,6 +63,7 @@ test("employee identity stays consistent across CIH chat, uploads and invoice pr
   const folder = await mkdtemp(path.join(tmpdir(), "cih-sso-test-"));
   await mkdir(path.join(folder, "data"));
   await copyFile(path.join(root, "server.js"), path.join(folder, "server.js"));
+  await copyFile(path.join(root, "portal-assistant.js"), path.join(folder, "portal-assistant.js"));
   await copyFile(path.join(root, "package.json"), path.join(folder, "package.json"));
   await symlink(path.join(root, "node_modules"), path.join(folder, "node_modules"));
   const child = spawn(process.execPath, [path.join(folder, "server.js")], { env: {

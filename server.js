@@ -4,6 +4,7 @@ import path from "path";
 import crypto from "crypto";
 import { fileURLToPath } from "url";
 import multer from "multer";
+import { installPortalAssistant } from "./portal-assistant.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ICONS_DIR = path.join(__dirname, "data/icons");
@@ -162,7 +163,7 @@ app.use(express.json());
 // Cloud Home provider IDs differ from employee UIDs used by business tools
 // and Dify file ownership. Resolve verified headers through the existing
 // invoice directory connection before invoking those tools.
-app.use(["/api/chat", "/api/check-auth", "/api/home-summary", "/api/meeting-intent", "/api/meeting-availability", "/invoice-proxy"], async (req, res, next) => {
+app.use(["/api/new", "/api/chat", "/api/check-auth", "/api/home-summary", "/api/meeting-intent", "/api/meeting-availability", "/invoice-proxy"], async (req, res, next) => {
   const providerUser = req.headers["remote-user"] || "";
   if (!/^[0-9a-f]{24}$/i.test(providerUser)) return next();
   const identityHeaders = { "Remote-User": providerUser };
@@ -197,6 +198,12 @@ app.use(["/api/chat", "/api/check-auth", "/api/home-summary", "/api/meeting-inte
 function assistantUser(req) {
   return req.assistantIdentity?.username || req.headers["remote-user"] || "anonymous";
 }
+
+installPortalAssistant(app, { assistantUser, audioUpload, root: __dirname });
+app.get("/new", (req, res) => {
+  if (req.path.endsWith("/")) return res.redirect(302, "/new");
+  res.set("Cache-Control", "no-store").sendFile(path.join(__dirname, "index.html"));
+});
 
 function getShanghaiNowParts(now = new Date()) {
   const formatter = new Intl.DateTimeFormat("en-CA", {

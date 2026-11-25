@@ -32,6 +32,7 @@ async function startTestServer(upstreamHandler, extraEnv = {}) {
   const folder = await mkdtemp(path.join(tmpdir(), "cih-home-summary-"));
   await mkdir(path.join(folder, "data"));
   await copyFile(path.join(root, "server.js"), path.join(folder, "server.js"));
+  await copyFile(path.join(root, "portal-assistant.js"), path.join(folder, "portal-assistant.js"));
   await copyFile(path.join(root, "package.json"), path.join(folder, "package.json"));
   await writeFile(path.join(folder, "data/stats.json"), JSON.stringify({
     pageViews: 20,

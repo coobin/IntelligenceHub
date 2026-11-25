@@ -34,7 +34,7 @@ function page({ history = [], text = "确认", responses = [] } = {}) {
   const saved = [];
   const context = vm.createContext({
     TextDecoder, console,
-    requestInFlight: false,
+    requestInFlight: false, portalAssistant: false,
     pendingMeetingAction: null,
     pendingMeetingContinuation: null,
     inputEl: { value: text, style: {}, focus() {} },

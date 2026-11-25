@@ -18,6 +18,7 @@ services:
       - ./admin.html:/app/admin.html
       - ./admin.js:/app/admin.js
       - ./server.js:/app/server.js
+      - ./portal-assistant.js:/app/portal-assistant.js
       - ./sw.js:/app/sw.js
       - ./config.js:/app/config.js
       - ./config.local.js:/app/config.local.js

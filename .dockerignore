@@ -1,6 +1,8 @@
 .git
 .editorconfig
 .env.example
+.env
+data/portal-policy.json
 LICENSE
 README.md
 Dockerfile
