@@ -478,6 +478,236 @@
         color: white;
       }
 
+      .chat-logs-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 16px;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+      }
+      .chat-logs-header h1 {
+        font-size: 28px;
+        margin: 0 0 8px;
+      }
+      .chat-logs-header p {
+        margin: 0;
+        color: #64748b;
+        font-size: 14px;
+      }
+      .stats-sub {
+        margin-top: 6px;
+        font-size: 12px;
+        color: #64748b;
+      }
+      .chat-filter-bar {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        padding: 16px 20px;
+        margin-bottom: 20px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+      }
+      .chat-filter-bar select,
+      .chat-filter-bar input[type="search"] {
+        padding: 9px 12px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        font-size: 14px;
+        background: #fff;
+        color: #0f172a;
+      }
+      .chat-filter-bar input[type="search"] {
+        flex: 1 1 220px;
+        min-width: 180px;
+      }
+      .chat-log-list {
+        display: grid;
+        gap: 14px;
+      }
+      .chat-log-card {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 16px 20px;
+        display: grid;
+        gap: 10px;
+      }
+      .chat-log-card.is-error {
+        border-color: #fecaca;
+        background: #fffafa;
+      }
+      .chat-log-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .chat-log-meta {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        font-size: 13px;
+        color: #475569;
+      }
+      .chat-log-user {
+        font-weight: 700;
+        color: #0f172a;
+      }
+      .chat-log-uid {
+        color: #64748b;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 12px;
+      }
+      .chat-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        background: #f1f5f9;
+        color: #334155;
+      }
+      .chat-badge.ok { background: #dcfce7; color: #166534; }
+      .chat-badge.warn { background: #fef3c7; color: #92400e; }
+      .chat-badge.err { background: #fee2e2; color: #991b1b; }
+      .chat-badge.route { background: #eff6ff; color: #1d4ed8; }
+      .chat-qa {
+        display: grid;
+        gap: 6px;
+        font-size: 14px;
+        line-height: 1.55;
+      }
+      .chat-qa-row {
+        display: grid;
+        grid-template-columns: 28px 1fr;
+        gap: 8px;
+        align-items: start;
+      }
+      .chat-qa-label {
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        width: 24px;
+        height: 22px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 700;
+        margin-top: 1px;
+      }
+      .chat-qa-label.q { background: #dbeafe; color: #1e40af; }
+      .chat-qa-label.a { background: #f1f5f9; color: #334155; }
+      .chat-qa-label.e { background: #fee2e2; color: #991b1b; }
+      .chat-qa-text {
+        margin: 0;
+        color: #0f172a;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .chat-qa-text.muted { color: #475569; }
+      .chat-qa-text.error { color: #b91c1c; }
+      .chat-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .chat-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 8px;
+        border-radius: 6px;
+        font-size: 12px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        color: #334155;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      .chat-tag.doc {
+        font-family: inherit;
+        background: #f0fdf4;
+        border-color: #bbf7d0;
+        color: #166534;
+      }
+      .chat-log-pagination {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 18px;
+        font-size: 13px;
+        color: #64748b;
+      }
+      .chat-session-dialog {
+        width: min(860px, calc(100vw - 32px));
+        max-height: 86vh;
+        border: none;
+        border-radius: 16px;
+        padding: 0;
+        box-shadow: 0 24px 60px rgba(15, 23, 42, 0.25);
+      }
+      .chat-session-dialog::backdrop {
+        background: rgba(15, 23, 42, 0.55);
+      }
+      .chat-session-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        padding: 18px 24px;
+        border-bottom: 1px solid #e2e8f0;
+        background: #f8fafc;
+      }
+      .chat-session-head h2 {
+        margin: 0;
+        font-size: 18px;
+      }
+      .chat-session-sub {
+        margin: 4px 0 0;
+        font-size: 13px;
+        color: #64748b;
+      }
+      .chat-session-body {
+        padding: 20px 24px;
+        overflow-y: auto;
+        max-height: calc(86vh - 82px);
+        display: grid;
+        gap: 16px;
+      }
+      .chat-turn-detail {
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 14px 16px;
+        display: grid;
+        gap: 10px;
+        background: #fff;
+      }
+      .chat-turn-detail pre {
+        margin: 0;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-family: inherit;
+        font-size: 14px;
+        line-height: 1.6;
+      }
+      .chat-empty-state {
+        background: white;
+        border: 1px dashed #cbd5e1;
+        border-radius: 14px;
+        padding: 40px 24px;
+        text-align: center;
+        color: #64748b;
+      }
+
       .hidden { display: none !important; }
     </style>
   </head>
@@ -499,6 +729,9 @@
           <div style="margin-bottom: 20px; color: #94a3b8; font-size: 11px; text-transform: uppercase; padding: 0 16px;">管理菜单</div>
           <a href="#" class="nav-link active" id="tabDashboard">
             <span>数据仪表盘</span>
+          </a>
+          <a href="#" class="nav-link" id="tabChatLogs">
+            <span>对话记录</span>
           </a>
           <a href="#" class="nav-link" id="tabEditor">
             <span>导航目录编辑</span>
@@ -588,6 +821,82 @@
         </div>
 
         <!-- Editor View -->
+        <div id="chatLogsView" class="hidden">
+          <header class="chat-logs-header">
+            <div>
+              <h1>助手对话记录</h1>
+              <p id="chatLogsSubtitle">记录新版助手（/new）的员工提问、回复、工具调用与 Token 消耗</p>
+            </div>
+            <button class="btn btn-ghost" id="chatLogsRefresh" type="button">刷新记录</button>
+          </header>
+
+          <div class="stats-grid">
+            <div class="stats-card">
+              <h3>对话轮次</h3>
+              <div class="value" id="chatStatTurns">0</div>
+              <div class="stats-sub" id="chatStatErrors">异常 0 次</div>
+            </div>
+            <div class="stats-card">
+              <h3>活跃员工 / 会话</h3>
+              <div class="value" id="chatStatUsers">0</div>
+              <div class="stats-sub" id="chatStatSessions">0 个会话</div>
+            </div>
+            <div class="stats-card">
+              <h3>Token 消耗</h3>
+              <div class="value" id="chatStatTokens">0</div>
+              <div class="stats-sub" id="chatStatTokenSplit">输入 0 / 输出 0</div>
+            </div>
+            <div class="stats-card">
+              <h3>平均响应耗时</h3>
+              <div class="value" id="chatStatLatency">0s</div>
+              <div class="stats-sub" id="chatStatRetention">默认保留 90 天</div>
+            </div>
+          </div>
+
+          <div class="chat-filter-bar">
+            <select id="chatFilterDays" aria-label="时间范围">
+              <option value="1">今天</option>
+              <option value="7" selected>近 7 天</option>
+              <option value="30">近 30 天</option>
+              <option value="90">近 90 天</option>
+            </select>
+            <select id="chatFilterUser" aria-label="员工筛选">
+              <option value="">全部员工</option>
+            </select>
+            <select id="chatFilterStatus" aria-label="状态筛选">
+              <option value="">全部状态</option>
+              <option value="ok">仅正常</option>
+              <option value="error">仅异常</option>
+              <option value="pending_confirmation">待确认</option>
+              <option value="no_tool">未调用工具</option>
+            </select>
+            <select id="chatFilterRoute" aria-label="路由筛选">
+              <option value="">全部交互方式</option>
+              <option value="model">模型问答</option>
+              <option value="shortcut">快捷查询</option>
+              <option value="policy_direct">制度直检</option>
+              <option value="confirm">写操作确认</option>
+              <option value="invoice_upload">发票上传</option>
+              <option value="invoice_confirm">发票确认</option>
+            </select>
+            <input type="search" id="chatFilterKeyword" placeholder="搜索提问、回复、工具名、traceId 或制度文档…" />
+            <button class="btn btn-primary" id="chatFilterApply" type="button">查询</button>
+            <button class="btn btn-ghost" id="chatFilterReset" type="button">重置</button>
+          </div>
+
+          <div id="chatLogsList" class="chat-log-list">
+            <div class="chat-empty-state">正在加载对话记录…</div>
+          </div>
+
+          <div class="chat-log-pagination" id="chatLogsPagination">
+            <span id="chatLogsCount">共 0 条</span>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-ghost" id="chatLogsPrev" type="button" disabled>上一页</button>
+              <button class="btn btn-ghost" id="chatLogsNext" type="button" disabled>下一页</button>
+            </div>
+          </div>
+        </div>
+
         <div id="editorView" class="hidden">
           <header class="editor-heading">
             <h1>导航目录编辑</h1>
@@ -614,6 +923,17 @@
         <button class="btn btn-ghost" id="cancelCatalogSort" type="button">取消</button>
         <button class="btn btn-primary" id="saveCatalogSort" type="button" disabled>保存顺序</button>
       </div>
+    </dialog>
+
+    <dialog class="chat-session-dialog" id="chatSessionDialog" aria-labelledby="chatSessionTitle">
+      <div class="chat-session-head">
+        <div>
+          <h2 id="chatSessionTitle">完整会话记录</h2>
+          <p class="chat-session-sub" id="chatSessionSub"></p>
+        </div>
+        <button class="btn btn-ghost" id="closeChatSession" type="button">关闭</button>
+      </div>
+      <div class="chat-session-body" id="chatSessionBody"></div>
     </dialog>
 
     <!-- 编辑 Item 模态框 -->
@@ -698,6 +1018,6 @@
     </div>
 
     <script defer src="https://unpkg.com/lucide@1.79.0/dist/umd/lucide.min.js" integrity="sha384-BqRrWtT4teonPDtZKRNshL/rppOoqxeAHLfUcL1tSbU0Slok4OE/xVxwdLb9R2ls" crossorigin="anonymous"></script>
-    <script defer src="admin.js?v=20261124_02"></script>
+    <script defer src="admin.js?v=20261125_01"></script>
   </body>
 </html>

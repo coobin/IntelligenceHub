@@ -199,7 +199,22 @@ function assistantUser(req) {
   return req.assistantIdentity?.username || req.headers["remote-user"] || "anonymous";
 }
 
-installPortalAssistant(app, { assistantUser, audioUpload });
+function assistantDisplayName(req) {
+  return truncateText(
+    req.assistantIdentity?.name
+    || decodeHeaderText(req.headers["remote-name"] || req.headers["x-forwarded-user"])
+    || assistantUser(req),
+    80
+  );
+}
+
+installPortalAssistant(app, {
+  assistantUser,
+  assistantDisplayName,
+  audioUpload,
+  authenticate: (req, res, next) => authenticate(req, res, next),
+  chatLogDir: path.join(__dirname, "data/chat-logs"),
+});
 app.get("/new", (req, res) => {
   if (req.path.endsWith("/")) return res.redirect(302, "/new");
   res.set("Cache-Control", "no-store").sendFile(path.join(__dirname, "index.html"));

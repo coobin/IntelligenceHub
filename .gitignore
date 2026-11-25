@@ -17,6 +17,7 @@ CLAUDE.md
 # Runtime data (auto-generated / instance-specific)
 data/stats.json
 data/portal-policy.json
+data/chat-logs/
 data/icons/*
 !data/icons/.gitkeep
 

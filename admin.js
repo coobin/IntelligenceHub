@@ -57,22 +57,36 @@ async function showAdmin() {
 }
 
 // Tab 切换逻辑
-document.getElementById("tabDashboard").addEventListener("click", (e) => {
-  e.preventDefault();
-  document.getElementById("dashboardView").classList.remove("hidden");
-  document.getElementById("editorView").classList.add("hidden");
-  document.getElementById("tabDashboard").classList.add("active");
-  document.getElementById("tabEditor").classList.remove("active");
+function switchAdminTab(tabName) {
+  const tabs = [
+    ["dashboard", "tabDashboard", "dashboardView"],
+    ["chatLogs", "tabChatLogs", "chatLogsView"],
+    ["editor", "tabEditor", "editorView"],
+  ];
+  for (const [name, tabId, viewId] of tabs) {
+    const active = name === tabName;
+    document.getElementById(tabId)?.classList.toggle("active", active);
+    document.getElementById(viewId)?.classList.toggle("hidden", !active);
+  }
+}
+
+document.getElementById("tabDashboard").addEventListener("click", (event) => {
+  event.preventDefault();
+  switchAdminTab("dashboard");
   loadStats();
 });
 
-document.getElementById("tabEditor").addEventListener("click", (e) => {
-  e.preventDefault();
-  document.getElementById("dashboardView").classList.add("hidden");
-  document.getElementById("editorView").classList.remove("hidden");
-  document.getElementById("tabDashboard").classList.remove("active");
-  document.getElementById("tabEditor").classList.add("active");
-  renderAdmin(); // 确保渲染
+document.getElementById("tabChatLogs").addEventListener("click", (event) => {
+  event.preventDefault();
+  switchAdminTab("chatLogs");
+  chatLogOffset = 0;
+  loadChatLogs();
+});
+
+document.getElementById("tabEditor").addEventListener("click", (event) => {
+  event.preventDefault();
+  switchAdminTab("editor");
+  renderAdmin();
 });
 
 document.getElementById("allEntryClicksToggle").addEventListener("click", () => {
@@ -793,3 +807,250 @@ document.getElementById("sectionForm").addEventListener("submit", (e) => {
 function closeSectionModal() {
   document.getElementById("sectionModal").style.display = "none";
 }
+
+let chatLogOffset = 0;
+const CHAT_LOG_PAGE_SIZE = 40;
+const ROUTE_LABELS = {
+  model: "模型问答",
+  shortcut: "快捷查询",
+  policy_direct: "制度直检",
+  confirm: "写操作确认",
+  invoice_upload: "发票上传",
+  invoice_confirm: "发票确认",
+};
+
+function formatChatTime(iso) {
+  if (!iso) return "-";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return String(iso);
+  return new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
+function formatDuration(ms) {
+  const num = toNumber(ms);
+  if (num < 1000) return `${num}ms`;
+  return `${(num / 1000).toFixed(1)}s`;
+}
+
+function chatStatusBadge(item) {
+  if (item.status === "error" || (item.httpStatus && item.httpStatus >= 400)) {
+    return `<span class="chat-badge err">异常 ${escapeHtml(item.httpStatus || "")}</span>`;
+  }
+  if (item.status === "pending_confirmation") {
+    return `<span class="chat-badge warn">待确认</span>`;
+  }
+  return `<span class="chat-badge ok">正常</span>`;
+}
+
+function renderChatTags(item) {
+  const parts = [];
+  for (const tool of Array.isArray(item.tools) ? item.tools : []) {
+    const tip = tool.traceId ? `trace_id: ${tool.traceId}` : `耗时 ${formatDuration(tool.durationMs)}`;
+    const mark = tool.status === "succeeded" ? "✓" : tool.status === "pending_confirmation" ? "…" : "!";
+    parts.push(`<span class="chat-tag" title="${escapeAttribute(tip)}">${escapeHtml(mark)} ${escapeHtml(tool.name)}</span>`);
+  }
+  for (const citation of Array.isArray(item.citations) ? item.citations : []) {
+    if (citation?.documentName) {
+      parts.push(`<span class="chat-tag doc">制度：${escapeHtml(citation.documentName)}</span>`);
+    }
+  }
+  return parts.length ? `<div class="chat-tags">${parts.join("")}</div>` : "";
+}
+
+async function loadChatLogs() {
+  const listEl = document.getElementById("chatLogsList");
+  const days = document.getElementById("chatFilterDays").value || "7";
+  const user = document.getElementById("chatFilterUser").value || "";
+  const status = document.getElementById("chatFilterStatus").value || "";
+  const route = document.getElementById("chatFilterRoute").value || "";
+  const keyword = document.getElementById("chatFilterKeyword").value.trim();
+
+  const params = new URLSearchParams({
+    days,
+    limit: String(CHAT_LOG_PAGE_SIZE),
+    offset: String(chatLogOffset),
+  });
+  if (user) params.set("user", user);
+  if (status) params.set("status", status);
+  if (route) params.set("route", route);
+  if (keyword) params.set("q", keyword);
+
+  listEl.innerHTML = `<div class="chat-empty-state">正在加载对话记录…</div>`;
+  try {
+    const res = await fetch(`/api/admin/chat-logs?${params.toString()}`, { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const summary = data.summary || {};
+
+    document.getElementById("chatStatTurns").innerText = toNumber(summary.totalTurns).toLocaleString();
+    document.getElementById("chatStatErrors").innerText = `异常 ${toNumber(summary.errorCount).toLocaleString()} 次`;
+    document.getElementById("chatStatUsers").innerText = toNumber(summary.uniqueUsers).toLocaleString();
+    document.getElementById("chatStatSessions").innerText = `${toNumber(summary.uniqueSessions).toLocaleString()} 个会话`;
+    document.getElementById("chatStatTokens").innerText = toNumber(summary.totalTokens).toLocaleString();
+    document.getElementById("chatStatTokenSplit").innerText = `输入 ${toNumber(summary.promptTokens).toLocaleString()} / 输出 ${toNumber(summary.completionTokens).toLocaleString()}`;
+    document.getElementById("chatStatLatency").innerText = formatDuration(summary.avgDurationMs);
+    document.getElementById("chatStatRetention").innerText = `自动保留近 ${toNumber(data.retentionDays) || 90} 天`;
+
+    const userSelect = document.getElementById("chatFilterUser");
+    const currentUser = userSelect.value;
+    userSelect.innerHTML = `<option value="">全部员工</option>` + (Array.isArray(data.users) ? data.users : []).map((entry) =>
+      `<option value="${escapeAttribute(entry.user)}">${escapeHtml(entry.userName || entry.user)} (${escapeHtml(entry.user)}) · ${toNumber(entry.count)}</option>`
+    ).join("");
+    userSelect.value = currentUser;
+
+    const items = Array.isArray(data.items) ? data.items : [];
+    const total = toNumber(data.total);
+    document.getElementById("chatLogsCount").innerText = total
+      ? `显示第 ${chatLogOffset + 1}–${Math.min(chatLogOffset + items.length, total)} 条，共 ${total} 条`
+      : "共 0 条";
+    document.getElementById("chatLogsPrev").disabled = chatLogOffset <= 0;
+    document.getElementById("chatLogsNext").disabled = chatLogOffset + items.length >= total;
+
+    if (!items.length) {
+      listEl.innerHTML = `<div class="chat-empty-state">当前筛选条件下暂无对话记录。</div>`;
+      return;
+    }
+
+    listEl.innerHTML = items.map((item) => {
+      const isError = item.status === "error" || (item.httpStatus && item.httpStatus >= 400);
+      const routeLabel = ROUTE_LABELS[item.route] || item.route || "对话";
+      const tokens = toNumber(item.usage?.totalTokens);
+      const answerRow = isError
+        ? `<div class="chat-qa-row"><span class="chat-qa-label e">错</span><p class="chat-qa-text error">${escapeHtml(item.error || "请求异常")}</p></div>`
+        : `<div class="chat-qa-row"><span class="chat-qa-label a">答</span><p class="chat-qa-text muted">${escapeHtml(item.answer || "（无文本回复）")}</p></div>`;
+      return `
+        <article class="chat-log-card ${isError ? "is-error" : ""}">
+          <div class="chat-log-top">
+            <div class="chat-log-meta">
+              <span class="chat-log-user">${escapeHtml(item.userName || item.user || "未知员工")}</span>
+              <span class="chat-log-uid">${escapeHtml(item.user || "")}</span>
+              <span>${escapeHtml(formatChatTime(item.ts))}</span>
+              <span class="chat-badge route">${escapeHtml(routeLabel)}</span>
+              ${chatStatusBadge(item)}
+              <span>耗时 ${escapeHtml(formatDuration(item.durationMs))}</span>
+              ${tokens ? `<span>${tokens.toLocaleString()} tok</span>` : ""}
+            </div>
+            <button class="btn btn-ghost" type="button" data-open-session="1" data-user="${escapeAttribute(item.user || "")}" data-session="${escapeAttribute(item.session || "")}">查看完整会话</button>
+          </div>
+          <div class="chat-qa">
+            <div class="chat-qa-row"><span class="chat-qa-label q">问</span><p class="chat-qa-text">${escapeHtml(item.query || "")}</p></div>
+            ${answerRow}
+          </div>
+          ${renderChatTags(item)}
+        </article>
+      `;
+    }).join("");
+  } catch (err) {
+    listEl.innerHTML = `<div class="chat-empty-state">加载对话记录失败：${escapeHtml(err.message)}</div>`;
+  }
+}
+
+async function openChatSession(user, session) {
+  const dialog = document.getElementById("chatSessionDialog");
+  const titleEl = document.getElementById("chatSessionTitle");
+  const subEl = document.getElementById("chatSessionSub");
+  const bodyEl = document.getElementById("chatSessionBody");
+  titleEl.innerText = "完整会话记录";
+  subEl.innerText = `${user} · ${session}`;
+  bodyEl.innerHTML = `<div class="chat-empty-state">正在加载会话详情…</div>`;
+  if (typeof dialog.showModal === "function") dialog.showModal();
+
+  try {
+    const params = new URLSearchParams({ user, session });
+    const res = await fetch(`/api/admin/chat-logs/session?${params.toString()}`, { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    titleEl.innerText = `${data.userName || data.user} 的完整会话`;
+    subEl.innerText = `账号 ${data.user} · 会话 ${data.session} · 共 ${toNumber(data.totalTurns)} 轮 · 合计 ${toNumber(data.totalTokens).toLocaleString()} tokens`;
+    const turns = Array.isArray(data.items) ? data.items : [];
+    if (!turns.length) {
+      bodyEl.innerHTML = `<div class="chat-empty-state">未找到该会话的记录。</div>`;
+      return;
+    }
+    bodyEl.innerHTML = turns.map((item, turnIndex) => {
+      const isError = item.status === "error" || (item.httpStatus && item.httpStatus >= 400);
+      const routeLabel = ROUTE_LABELS[item.route] || item.route || "对话";
+      const usage = item.usage || {};
+      const tokenMeta = toNumber(usage.totalTokens)
+        ? ` · Token ${toNumber(usage.totalTokens).toLocaleString()}（入 ${toNumber(usage.promptTokens)} / 出 ${toNumber(usage.completionTokens)}）`
+        : "";
+      const toolDetails = (Array.isArray(item.tools) ? item.tools : []).map((tool) =>
+        `<span class="chat-tag">${escapeHtml(tool.name)} (${escapeHtml(tool.status)}, ${escapeHtml(formatDuration(tool.durationMs))}${tool.traceId ? `, trace: ${escapeHtml(tool.traceId)}` : ""})</span>`
+      ).join("");
+      const docDetails = (Array.isArray(item.citations) ? item.citations : []).map((citation) =>
+        citation?.documentName ? `<span class="chat-tag doc">制度：${escapeHtml(citation.documentName)}</span>` : ""
+      ).join("");
+      return `
+        <div class="chat-turn-detail">
+          <div class="chat-log-meta">
+            <strong>第 ${turnIndex + 1} 轮</strong>
+            <span>${escapeHtml(formatChatTime(item.ts))}</span>
+            <span class="chat-badge route">${escapeHtml(routeLabel)}</span>
+            ${chatStatusBadge(item)}
+            <span>耗时 ${escapeHtml(formatDuration(item.durationMs))}${escapeHtml(tokenMeta)}</span>
+            ${item.model ? `<span class="chat-log-uid">${escapeHtml(item.model)}</span>` : ""}
+          </div>
+          <div class="chat-qa-row"><span class="chat-qa-label q">问</span><pre>${escapeHtml(item.query || "")}</pre></div>
+          ${isError
+            ? `<div class="chat-qa-row"><span class="chat-qa-label e">错</span><pre style="color:#b91c1c;">${escapeHtml(item.error || "请求异常")}</pre></div>`
+            : `<div class="chat-qa-row"><span class="chat-qa-label a">答</span><pre>${escapeHtml(item.answer || "（无文本回复）")}</pre></div>`}
+          ${(toolDetails || docDetails) ? `<div class="chat-tags">${toolDetails}${docDetails}</div>` : ""}
+        </div>
+      `;
+    }).join("");
+  } catch (err) {
+    bodyEl.innerHTML = `<div class="chat-empty-state">加载会话详情失败：${escapeHtml(err.message)}</div>`;
+  }
+}
+
+document.getElementById("chatLogsRefresh")?.addEventListener("click", () => loadChatLogs());
+document.getElementById("chatFilterApply")?.addEventListener("click", () => {
+  chatLogOffset = 0;
+  loadChatLogs();
+});
+document.getElementById("chatFilterReset")?.addEventListener("click", () => {
+  document.getElementById("chatFilterDays").value = "7";
+  document.getElementById("chatFilterUser").value = "";
+  document.getElementById("chatFilterStatus").value = "";
+  document.getElementById("chatFilterRoute").value = "";
+  document.getElementById("chatFilterKeyword").value = "";
+  chatLogOffset = 0;
+  loadChatLogs();
+});
+for (const selectId of ["chatFilterDays", "chatFilterUser", "chatFilterStatus", "chatFilterRoute"]) {
+  document.getElementById(selectId)?.addEventListener("change", () => {
+    chatLogOffset = 0;
+    loadChatLogs();
+  });
+}
+document.getElementById("chatFilterKeyword")?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    chatLogOffset = 0;
+    loadChatLogs();
+  }
+});
+document.getElementById("chatLogsPrev")?.addEventListener("click", () => {
+  chatLogOffset = Math.max(0, chatLogOffset - CHAT_LOG_PAGE_SIZE);
+  loadChatLogs();
+});
+document.getElementById("chatLogsNext")?.addEventListener("click", () => {
+  chatLogOffset += CHAT_LOG_PAGE_SIZE;
+  loadChatLogs();
+});
+document.getElementById("chatLogsList")?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-open-session]");
+  if (!button) return;
+  openChatSession(button.dataset.user || "", button.dataset.session || "");
+});
+document.getElementById("closeChatSession")?.addEventListener("click", () => {
+  document.getElementById("chatSessionDialog")?.close();
+});
