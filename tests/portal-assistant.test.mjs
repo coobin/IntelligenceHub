@@ -12,6 +12,8 @@ test("portal scopes confirmation to employee and conversation and consumes it on
   const upstream = express();
   upstream.use(express.json());
   let writes = 0;
+  const availabilityCalls = [];
+  let roomData = [];
   upstream.post("/mcp", (req, res) => {
     assert.equal(req.headers.cookie, "authelia_session=test");
     const { method, params, id } = req.body;
@@ -33,9 +35,9 @@ test("portal scopes confirmation to employee and conversation and consumes it on
           summary: "共一场会议", data: { meetings } } } });
       }
       if (params.name === "meet_check_availability") {
-        assert.deepEqual(params.arguments, { date: new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai" }).format(new Date()) });
+        availabilityCalls.push(params.arguments);
         return res.json({ id, jsonrpc: "2.0", result: { structuredContent: { status: "succeeded",
-          summary: "已查询会议室空闲时段", data: { rooms: [] } } } });
+          summary: "已查询会议室空闲时段", data: { rooms: roomData } } } });
       }
       if (params.name === "policy_search") {
         assert.equal(params.arguments.query, "差旅制度");
@@ -84,6 +86,32 @@ test("portal scopes confirmation to employee and conversation and consumes it on
   const empty = await rooms.json();
   assert.equal(empty.text, "已查询会议室空闲时段");
   assert.equal(empty.card.type, "availability_empty");
+  const shanghai = offset => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai" })
+    .format(new Date(Date.now() + offset * 86400000));
+  assert.deepEqual(availabilityCalls, [{ date: shanghai(0) }]);
+  roomData = [{ room: { name: "A" }, freeSlots: [{ start: "10:00", end: "11:00" }, { start: "14:00", end: "15:00" }] }];
+  const directCases = [
+    ["查一下今天空闲的会议室", { date: shanghai(0) }],
+    ["明天有哪些会议室空闲？", { date: shanghai(1) }],
+    ["帮我看看后天下午有没有空闲的会议室", { date: shanghai(2) }, "14:00"],
+    ["2027-01-01上午还有会议室吗", { date: "2027-01-01" }, "10:00"],
+    ["明天下午2点到3点有哪些可用会议室", { date: shanghai(1), start: "14:00", end: "15:00" }],
+  ];
+  for (const [question, args, firstSlot] of directCases) {
+    const count = availabilityCalls.length;
+    const response = await chat("first", "rooms", undefined, question);
+    assert.equal(response.status, 200, question);
+    const reply = await response.json();
+    assert.equal(reply.card.type, "availability_results");
+    assert.deepEqual(availabilityCalls.slice(count), [args]);
+    if (firstSlot) assert.deepEqual(reply.card.rooms[0].freeSlots.map(slot => slot.start), [firstSlot]);
+  }
+  for (const question of ["查一下今天能容纳12人的会议室", "查一下今天有投影的空闲会议室", "取消我今天的会议", "帮我预约今天空闲的会议室", "比较今天和明天会议室的空闲情况"]) {
+    const count = availabilityCalls.length;
+    // No model key here. A complex request should never silently return a generic card.
+    assert.equal((await chat("first", "complex", undefined, question)).status, 503, question);
+    assert.equal(availabilityCalls.length, count);
+  }
   const expense = (await (await chat("first", "expense", undefined, "查询我的通讯费报销记录")).json()).card;
   assert.equal(expense.type, "invoice_list");
   assert.equal(expense.range.label, "第 1 页 · 共 2 条");
@@ -184,7 +212,7 @@ test("portal persists sanitized chat logs, prunes expired files, and exposes adm
     body: JSON.stringify({ query, session }),
   });
 
-  const firstTurn = await postChat("alice", "Alice", "sess-1", "明天有哪些会议室空闲？");
+  const firstTurn = await postChat("alice", "Alice", "sess-1", "明天哪些空闲会议室能坐十个人？");
   assert.equal(firstTurn.status, 200);
   const reply = await firstTurn.json();
   assert.equal(reply.text, "明天 D01 10:00-11:00 空闲。");
@@ -228,6 +256,6 @@ test("portal persists sanitized chat logs, prunes expired files, and exposes adm
   assert.equal(sessionRes.status, 200);
   const sessionBody = await sessionRes.json();
   assert.equal(sessionBody.totalTurns, 2);
-  assert.equal(sessionBody.items[0].query, "明天有哪些会议室空闲？");
+  assert.equal(sessionBody.items[0].query, "明天哪些空闲会议室能坐十个人？");
   assert.equal(sessionBody.items[1].query, "今天的会议室情况是啥？");
 });
