@@ -3244,6 +3244,20 @@ if (nativeUploadBtn && nativeInvoiceUpload) {
     if (files.length === 0) return;
     
     nativeInvoiceUpload.value = "";
+    if (nativeInvoiceUpload.disabled) return;
+    nativeInvoiceUpload.disabled = true;
+    const modal = document.getElementById('invoiceResultModal');
+    const modalBody = document.getElementById('invoiceModalBody');
+    const modalFooter = document.getElementById('invoiceModalFooter');
+    const modalTitle = document.getElementById('invoiceModalTitle');
+    const closeButton = document.getElementById('invoiceModalClose');
+    modalTitle.textContent = "正在上传并识别发票";
+    modalFooter.replaceChildren();
+    closeButton.disabled = true;
+    const status = document.createElement("p");
+    status.setAttribute("role", "status");
+    modalBody.replaceChildren(status);
+    modal.setAttribute('aria-hidden', 'false');
     const originalText = nativeUploadBtn.innerHTML;
     nativeUploadBtn.innerHTML = `<i data-lucide="loader"></i> 识别中(${files.length}张)...`;
     nativeUploadBtn.style.pointerEvents = "none";
@@ -3266,6 +3280,7 @@ if (nativeUploadBtn && nativeInvoiceUpload) {
     try {
       const results = [];
       for (const file of files) {
+        status.textContent = `正在处理第 ${results.length + 1} / ${files.length} 张：${file.name}`;
         try {
           const formData = new FormData();
           formData.append("file", file);
@@ -3280,10 +3295,6 @@ if (nativeUploadBtn && nativeInvoiceUpload) {
           results.push({ file, success: false, error: err.message });
         }
       }
-
-      const modal = document.getElementById('invoiceResultModal');
-      const modalBody = document.getElementById('invoiceModalBody');
-      const modalFooter = document.getElementById('invoiceModalFooter');
 
       modalBody.innerHTML = results.map(r => {
         if (!r.success) {
@@ -3384,8 +3395,12 @@ if (nativeUploadBtn && nativeInvoiceUpload) {
       modal.setAttribute('aria-hidden', 'false');
 
     } catch (err) {
+      modal.setAttribute('aria-hidden', 'true');
       showToast(`❌ 内部错误：${err.message}`, true);
     } finally {
+      modalTitle.textContent = "发票识别结果";
+      closeButton.disabled = false;
+      nativeInvoiceUpload.disabled = false;
       nativeUploadBtn.innerHTML = originalText;
       nativeUploadBtn.style.pointerEvents = "auto";
       if (window.lucide) window.lucide.createIcons();
