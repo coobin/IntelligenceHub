@@ -2483,6 +2483,13 @@ function renderAssistant() {
 
     if (portalAssistant) {
       if (!text.trim()) return;
+      if (!options.confirm && text.trim().split(/\r?\n/).every(line => /^[^\r\n!?？。]+\.pdf$/i.test(line.trim()))) {
+        inputEl.value = "";
+        inputEl.dispatchEvent(new Event("input"));
+        appendMessage("system", "目前只收到了文件名，请选择 PDF 原件上传报销。");
+        document.getElementById("nativeInvoiceUpload").click();
+        return;
+      }
       if (!options.confirm) ensureDailySessionBeforeSend();
       setAssistantExpanded(true);
       setSessionControlsLocked(true);
@@ -3239,8 +3246,7 @@ if (nativeUploadBtn && nativeInvoiceUpload) {
     nativeInvoiceUpload.click();
   });
 
-  nativeInvoiceUpload.addEventListener("change", async (e) => {
-    const files = Array.from(e.target.files);
+  const uploadInvoices = async (files) => {
     if (files.length === 0) return;
     
     nativeInvoiceUpload.value = "";
@@ -3405,5 +3411,24 @@ if (nativeUploadBtn && nativeInvoiceUpload) {
       nativeUploadBtn.style.pointerEvents = "auto";
       if (window.lucide) window.lucide.createIcons();
     }
+  };
+  nativeInvoiceUpload.addEventListener("change", event => uploadInvoices(Array.from(event.target.files)));
+  const panel = document.getElementById("assistantPanel");
+  panel.addEventListener("dragover", event => {
+    if (event.dataTransfer.types.includes("Files")) event.preventDefault();
   });
+  for (const type of ["drop", "paste"]) {
+    panel.addEventListener(type, event => {
+      const transfer = event.dataTransfer || event.clipboardData;
+      const files = Array.from(transfer?.files || []);
+      if (!files.length) return;
+      event.preventDefault();
+      const pdfs = files.filter(file => file.type === "application/pdf" || /\.pdf$/i.test(file.name));
+      if (pdfs.length !== files.length || nativeInvoiceUpload.disabled) {
+        window.alert(nativeInvoiceUpload.disabled ? "正在处理上一批发票，请稍后再上传。" : "拖入或粘贴报销附件时，请选择 PDF 文件。");
+        return;
+      }
+      uploadInvoices(pdfs);
+    });
+  }
 }
