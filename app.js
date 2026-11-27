@@ -2069,13 +2069,15 @@ function renderAssistant() {
         ? window.DOMPurify.sanitize(window.marked.parse(escapeHtml(answer)))
         : escapeHtml(answer);
       const card = reply?.card;
+      const timing = Number.isFinite(reply?.durationMs) && reply.durationMs >= 0
+        ? `<small class="assistant-reply-duration">耗时 ${(reply.durationMs / 1000).toFixed(1)} 秒</small>` : "";
       const kind = card?.type === "invoice_list" ? "expense" :
         ["query_results", "query_empty", "availability_results", "availability_empty"].includes(card?.type) ? "meeting" : "";
       if (kind) {
         contentDiv.parentElement?.classList.add(`assistant-message-${kind}`);
         contentDiv.classList.add(`has-${kind}-ui`);
         contentDiv.innerHTML = (reply.showAnswer ? answerHtml : "") +
-          (kind === "expense" ? renderExpenseUi(card) : renderMeetingUi(card)) + renderCitations(reply.citations);
+          (kind === "expense" ? renderExpenseUi(card) : renderMeetingUi(card)) + renderCitations(reply.citations) + timing;
         window.lucide?.createIcons();
         return;
       }
@@ -2092,6 +2094,7 @@ function renderAssistant() {
         };
         contentDiv.append(button);
       }
+      contentDiv.insertAdjacentHTML("beforeend", timing);
       return;
     }
     const citationsParsed = parseCitationsReply(text);
@@ -2501,20 +2504,22 @@ function renderAssistant() {
       inputEl.dispatchEvent(new Event("input"));
       appendMessage("user", escapeHtml(text));
       const output = appendMessage("system", "正在查询…", { skipHistory: true });
+      const startedAt = performance.now();
+      let result;
       try {
         const response = await fetch("/api/new/chat", {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ query: text, session: activeSessionId, history, confirm }),
         });
-        const result = await response.json();
+        result = await response.json();
         if (!response.ok) throw new Error(result.message || "助手请求失败。");
-        const saved = JSON.stringify(result);
+      } catch (err) {
+        result = { text: confirm ? `${err.message} 请核对本人业务记录后再操作。` : err.message };
+      }
+      try {
+        const saved = JSON.stringify({ ...result, durationMs: Math.round(performance.now() - startedAt) });
         renderSystemReply(output, saved, true);
         rememberMessage("system", saved);
-      } catch (err) {
-        const message = confirm ? `${err.message} 请核对本人会议记录后再操作。` : err.message;
-        output.textContent = message;
-        rememberMessage("system", JSON.stringify({ text: message }));
       } finally {
         setSessionControlsLocked(false);
         messagesEl.scrollTop = messagesEl.scrollHeight;
