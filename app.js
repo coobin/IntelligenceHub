@@ -714,12 +714,7 @@ function applyBranding() {
   setText(".brand-name", c.brandName);
   if (c.brandSubtitle !== c.brandName) setText(".brand-subtitle", c.brandSubtitle);
   if (c.assistantName) {
-    const homeAssistantName = c.assistantName.replace(/助手$/, "");
     setText(".assistant-message-system .assistant-message-content", `你好！我是${c.assistantName}，有什么我可以帮您的吗？`);
-    const inputEl = document.querySelector("#assistantInput");
-    if (inputEl) {
-      inputEl.setAttribute("placeholder", `搜系统入口，或问${homeAssistantName}…`);
-    }
   }
   if (c.poweredBy) setText(".assistant-footer", `POWERED BY ${c.poweredBy}`);
 
