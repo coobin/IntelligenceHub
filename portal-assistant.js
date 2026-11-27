@@ -275,8 +275,10 @@ export function installPortalAssistant(app, { assistantUser, assistantDisplayNam
   app.use("/api/new", (req, res, next) => {
     res.set("Cache-Control", "no-store");
     if (!req.headers["remote-user"]) return res.status(401).json({ message: "请先登录工作台。" });
-    if (!process.env.PORTAL_ORIGIN || req.headers.origin !== process.env.PORTAL_ORIGIN ||
-      !String(process.env.PORTAL_PROXY_IPS || "").split(",").includes(req.socket.remoteAddress?.replace(/^::ffff:/, "")))
+    const allowedOrigins = String(process.env.PORTAL_ORIGIN || "").split(",").map(origin => origin.trim()).filter(Boolean);
+    const allowedProxyIps = String(process.env.PORTAL_PROXY_IPS || "").split(",").map(ip => ip.trim()).filter(Boolean);
+    if (!allowedOrigins.length || !allowedOrigins.includes(req.headers.origin) ||
+      !allowedProxyIps.includes(req.socket.remoteAddress?.replace(/^::ffff:/, "")))
       return res.status(403).json({ message: "请通过公司统一入口使用助手。" });
     next();
   });
