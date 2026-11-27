@@ -20,10 +20,19 @@ test("portal scopes confirmation to employee and conversation and consumes it on
     if (method === "notifications/initialized") return res.sendStatus(202);
     let result;
     if (method === "initialize") result = { protocolVersion: "2025-06-18" };
-    if (method === "tools/list") result = { tools: ["meet_preview_booking", "meet_confirm_booking"].map(name => ({
+    if (method === "tools/list") result = { tools: ["meet_preview_booking", "meet_confirm_booking", "xrxs_preview_my_leave_request", "xrxs_confirm_my_leave", "xrxs_get_my_leave_balance"].map(name => ({
       name, inputSchema: { type: "object" },
     })) };
     if (method === "tools/call") {
+      if (params.name === "xrxs_preview_my_leave_request") {
+        return res.json({ id, result: { structuredContent: { status: "pending_confirmation", data: {
+          假种: "年假", 开始: "2026-11-30 上午", 结束: "2026-11-30 下午", 时区: "北京时间", 单位: "按天", 事由: "家庭事务", 内部确认引用: "private-leave-ref",
+        } } } });
+      }
+      if (params.name === "xrxs_confirm_my_leave") {
+        assert.deepEqual(params.arguments, { confirmation_id: "private-leave-ref" });
+        return res.json({ id, result: { structuredContent: { status: "succeeded", summary: "已提交审批" } } });
+      }
       if (params.name === "invoice_list_reimbursements") {
         const records = [{ amount: "123.45", billing_periods: ["202605", "202606"], status: "archived", created_at: "2026-07-01" }];
         return res.json({ id, jsonrpc: "2.0", result: { structuredContent: { status: "succeeded",
@@ -55,7 +64,9 @@ test("portal scopes confirmation to employee and conversation and consumes it on
   });
   upstream.post("/chat/completions", (req, res) => {
     assert.ok(!req.body.tools.some(tool => tool.function.name.includes("confirm")));
-    res.json({ choices: [{ message: { tool_calls: [{ function: { name: "meet_preview_booking", arguments: "{}" } }] } }] });
+    assert.ok(req.body.tools.some(tool => tool.function.name === "xrxs_get_my_leave_balance"));
+    const name = req.body.messages.at(-1).content.includes("年假") ? "xrxs_preview_my_leave_request" : "meet_preview_booking";
+    res.json({ choices: [{ message: { tool_calls: [{ function: { name, arguments: "{}" } }] } }] });
   });
   const listen = async app => {
     const server = app.listen(0, "127.0.0.1");
@@ -81,6 +92,13 @@ test("portal scopes confirmation to employee and conversation and consumes it on
   assert.equal((await (await chat("first", "one", preview.confirm)).json()).status, "succeeded");
   assert.equal((await chat("first", "one", preview.confirm)).status, 409);
   assert.equal(writes, 1);
+  const leave = await (await chat("first", "leave", undefined, "申请年假")).json();
+  assert.match(leave.text, /尚未提交/);
+  assert.match(leave.text, /家庭事务/);
+  assert.ok(!JSON.stringify(leave).includes("private-leave-ref"));
+  assert.equal((await chat("second", "leave", leave.confirm)).status, 409);
+  assert.equal((await (await chat("first", "leave", leave.confirm)).json()).text, "已提交审批");
+  assert.equal((await chat("first", "leave", leave.confirm)).status, 409);
   delete process.env.PORTAL_MODEL_KEY;
   const rooms = await chat("first", "rooms", undefined, "今天的会议室情况是啥？");
   const empty = await rooms.json();
