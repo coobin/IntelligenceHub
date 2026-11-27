@@ -24,6 +24,16 @@ test("portal scopes confirmation to employee and conversation and consumes it on
       name, inputSchema: { type: "object" },
     })) };
     if (method === "tools/call") {
+      if (params.name === "xrxs_list_my_requests") {
+        return res.json({ id, result: { structuredContent: { status: "succeeded", data: { 记录: [
+          { 类型: "请假", 状态: 0, 内部引用: "1" }, { 类型: "请假", 状态: 3, 内部引用: "2" },
+          { 类型: "出差", 状态: 0, 内部引用: "3" },
+        ] } } } });
+      }
+      if (params.name === "xrxs_get_my_request") {
+        assert.deepEqual(params.arguments, { request_id: "1" });
+        return res.json({ id, result: { structuredContent: { status: "succeeded", data: { 状态: 0, 当前审批人: ["测试审批人"] } } } });
+      }
       if (params.name === "xrxs_preview_my_leave_request") {
         return res.json({ id, result: { structuredContent: { status: "pending_confirmation", data: {
           假种: "年假", 开始: "2026-11-30 上午", 结束: "2026-11-30 下午", 时区: "北京时间", 单位: "按天", 事由: "家庭事务", 内部确认引用: "private-leave-ref",
@@ -100,6 +110,11 @@ test("portal scopes confirmation to employee and conversation and consumes it on
   assert.equal((await (await chat("first", "leave", leave.confirm)).json()).text, "已提交审批");
   assert.equal((await chat("first", "leave", leave.confirm)).status, 409);
   delete process.env.PORTAL_MODEL_KEY;
+  for (const query of ["查一下我的请假流程到哪了", "我的请假现在到谁审批了？"]) {
+    const progress = await (await chat("first", "progress", undefined, query)).json();
+    assert.equal(progress.status, "succeeded");
+    assert.match(progress.text, /当前审批人：测试审批人/);
+  }
   const rooms = await chat("first", "rooms", undefined, "今天的会议室情况是啥？");
   const empty = await rooms.json();
   assert.equal(empty.text, "已查询会议室空闲时段");

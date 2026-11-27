@@ -135,6 +135,8 @@ function directQuery(query) {
     .replace(/[吗呢呀吧]$/u, "");
   if (/^(?:我的?)?(?:通讯费|通信费|话费)(?:的)?报销(?:记录|历史|明细|情况)$/.test(subject))
     return { tool: "invoice_list_reimbursements", args: {} };
+  if (/^(?:我(?:的|提交的|发起的)?|本人(?:的)?)?请假(?:申请)?(?:的)?(?:流程|审批)?(?:现在|目前|当前)?(?:到哪(?:里|一步)?了|进度|到谁(?:审批|处理)了?|在等谁(?:审批|处理)|审批人是谁)$/.test(subject))
+    return { tool: "xrxs_list_my_requests", args: {} };
 
   const day = subject.match(/今天|今日|明天|明日|后天|20\d{2}-\d{2}-\d{2}/u)?.[0];
   const baseDate = today();
@@ -173,6 +175,24 @@ function directQuery(query) {
   if (((day || period || interval) && asksForRoom) || roomQuestions.some(pattern => pattern.test(subject))) {
     return { tool: "meet_check_availability", args: { date, ...times }, period };
   }
+}
+
+async function leaveProgress(call, result) {
+  if (result.status !== "succeeded") return result;
+  const records = result.data?.记录;
+  if (!Array.isArray(records)) throw failure(502, "暂时无法核实请假记录。");
+  const lines = [];
+  for (const record of records.filter(item => item.类型 === "请假" && item.状态 === 0)) {
+    const detail = await call("xrxs_get_my_request", { request_id: record.内部引用 });
+    if (detail.status !== "succeeded") return detail;
+    if (!Number.isInteger(detail.data?.状态)) throw failure(502, "暂时无法核实请假状态。");
+    if (detail.data.状态 !== 0) continue;
+    const date = record.提交时间 ? shanghaiDateFor(new Date(record.提交时间 * 1000)) : "";
+    const names = detail.data.当前审批人?.join("、");
+    lines.push(`${date}提交的请假申请正在审批，${names ? `当前审批人：${names}` : "当前审批人暂未查到"}。`);
+  }
+  if (result.data.未完整返回) lines.push("近期记录较多，仅核实了已返回的部分。");
+  return { status: "succeeded", summary: lines.join("\n") || "最近 30 天提交的请假申请中，没有正在审批的记录。" };
 }
 
 // The MCP start/end filters require the whole interval to be free. For a
@@ -464,6 +484,11 @@ export function installPortalAssistant(app, { assistantUser, assistantDisplayNam
         route = "shortcut";
         const { tool, args, period } = direct;
         const result = filterRoomPeriod(await call(tool, args), period);
+        if (tool === "xrxs_list_my_requests") {
+          const progress = await leaveProgress(call, result);
+          recordTurn({ answer: progress.summary, status: progress.status });
+          return res.json({ text: progress.summary, status: progress.status });
+        }
         const text = listText(tool, result);
         const card = queryCard(tool, result, args);
         if (period && card) card.title = period + "会议室空闲时段";
